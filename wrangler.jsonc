@@ -12,5 +12,26 @@
 			"database_name": "billbot-db",
 			"database_id": "d988c417-e796-4f19-b41f-0533290112c2"
 		}
-	]
+	],
+	"kv_namespaces": [
+		{
+			"binding": "KV",
+			"id": "06ceb99c6e7d4655b08ff31f712927ba"
+		}
+	],
+	"queues": {
+		"producers": [
+			{
+				"binding": "MY_QUEUE",
+				"queue": "dbfb0972623f4924be12c13b2e3af655"
+			}
+		],
+		"consumers": [
+			{
+				"queue": "dbfb0972623f4924be12c13b2e3af655",
+				"max_batch_size": 10,
+				"dead_letter_queue": "my-queue-dlq"
+			}
+		]
+	}
 }
