@@ -1,50 +1,129 @@
-import { ApiException, fromHono } from "chanfana";
+/**
+ * Cloudflare Worker entry point.
+ *
+ * Architecture:
+ *   Telegram → POST /webhook → Cloudflare Queue → Consumer → grammY Bot → D1/KV
+ *
+ * The fetch handler (Hono) is STATELESS:
+ *   - Validates the webhook secret
+ *   - Pushes the raw Telegram update to the queue
+ *   - Returns 200 immediately
+ *
+ * The queue handler processes updates:
+ *   - Idempotency check via KV
+ *   - Runs the grammY bot logic
+ *   - Acks/retries per message
+ */
+
 import { Hono } from "hono";
-import { tasksRouter } from "./endpoints/tasks/router";
-import { ContentfulStatusCode } from "hono/utils/http-status";
-import { DummyEndpoint } from "./endpoints/dummyEndpoint";
+import { createBot } from "./bot";
+import { isDuplicate, markProcessed } from "./utils/idempotency";
+import type { AppEnv, HandlerContext } from "./env";
+import type { Update } from "grammy/types";
 
-// Start a Hono app
-const app = new Hono<{ Bindings: Env }>();
+// ─── Hono App (Webhook Receiver) ──────────────────────────────────
 
-app.onError((err, c) => {
-	if (err instanceof ApiException) {
-		// If it's a Chanfana ApiException, let Chanfana handle the response
-		return c.json(
-			{ success: false, errors: err.buildResponse() },
-			err.status as ContentfulStatusCode,
-		);
-	}
+const app = new Hono<{ Bindings: AppEnv }>();
 
-	console.error("Global error handler caught:", err); // Log the error if it's not known
-
-	// For other errors, return a generic 500 response
-	return c.json(
-		{
-			success: false,
-			errors: [{ code: 7000, message: "Internal Server Error" }],
-		},
-		500,
-	);
+// Health check
+app.get("/", (c) => {
+  return c.json({ status: "ok", bot: "billbot" });
 });
 
-// Setup OpenAPI registry
-const openapi = fromHono(app, {
-	docs_url: "/",
-	schema: {
-		info: {
-			title: "My Awesome API",
-			version: "2.0.0",
-			description: "This is the documentation for my awesome API.",
-		},
-	},
+// Telegram webhook endpoint — STATELESS, no business logic
+app.post("/webhook", async (c) => {
+  // Validate secret token from Telegram
+  const secretHeader = c.req.header("X-Telegram-Bot-Api-Secret-Token");
+  if (secretHeader !== c.env.BOT_SECRET) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  try {
+    const update = await c.req.json();
+
+    // Push to queue for async processing
+    await c.env.MY_QUEUE.send(update);
+
+    return c.json({ ok: true });
+  } catch (err) {
+    console.error("Webhook error:", err);
+    // Always return 200 to prevent Telegram from retrying
+    return c.json({ ok: true });
+  }
 });
 
-// Register Tasks Sub router
-openapi.route("/tasks", tasksRouter);
+// ─── Queue Consumer ───────────────────────────────────────────────
 
-// Register other endpoints
-openapi.post("/dummy/:slug", DummyEndpoint);
+/**
+ * Per-update handler context.
+ *
+ * We store the current HandlerContext in a module-level variable before
+ * each bot.handleUpdate() call so the registered grammY middleware can
+ * access bindings. This is safe because:
+ *
+ * 1. Workers process one queue batch at a time within a single isolate.
+ * 2. We await each handleUpdate() sequentially within the batch loop.
+ * 3. The variable is reset in a `finally` block after each update.
+ */
+let currentCtx: HandlerContext | null = null;
 
-// Export the Hono app
-export default app;
+function getHandlerContext(): HandlerContext {
+  if (!currentCtx) {
+    throw new Error("HandlerContext not available — called outside queue consumer");
+  }
+  return currentCtx;
+}
+
+async function handleQueueBatch(
+  batch: MessageBatch<Update>,
+  env: AppEnv
+): Promise<void> {
+  // Create bot once per batch — middleware is registered once
+  const bot = createBot(env.BOT_TOKEN, getHandlerContext);
+
+  // Initialize bot (loads bot info — cached after first call)
+  await bot.init();
+
+  for (const message of batch.messages) {
+    const update = message.body;
+
+    try {
+      // Idempotency check: skip already-processed updates
+      if (await isDuplicate(env.KV, update.update_id)) {
+        console.log(`Skipping duplicate update: ${update.update_id}`);
+        message.ack();
+        continue;
+      }
+
+      // Set the handler context for this update
+      currentCtx = { db: env.DB, kv: env.KV };
+
+      await bot.handleUpdate(update);
+
+      // Mark as processed for idempotency
+      await markProcessed(env.KV, update.update_id);
+
+      message.ack();
+    } catch (err) {
+      console.error(`Error processing update ${update.update_id}:`, err);
+      // Retry by not acking — message will be redelivered
+      message.retry();
+    } finally {
+      currentCtx = null;
+    }
+  }
+}
+
+// ─── Export Worker ────────────────────────────────────────────────
+
+export default {
+  fetch: app.fetch,
+
+  async queue(
+    batch: MessageBatch<Update>,
+    env: AppEnv,
+    _ctx: ExecutionContext
+  ): Promise<void> {
+    await handleQueueBatch(batch, env);
+  },
+};

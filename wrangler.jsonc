@@ -6,6 +6,9 @@
 	"observability": {
 		"enabled": true
 	},
+	"vars": {
+		"BOT_SECRET": "CHANGE_ME_TO_RANDOM_SECRET"
+	},
 	"d1_databases": [
 		{
 			"binding": "DB",
