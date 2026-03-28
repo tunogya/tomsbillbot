@@ -1,7 +1,7 @@
 /**
  * User configuration handlers (DM commands).
- * /set_rate <hourly_rate>
- * /set_address <USDT_address>
+ * /setrate <hourly_rate>
+ * /setaddress <USDT_address>
  */
 
 import type { Context } from "grammy";
@@ -12,8 +12,8 @@ export function registerConfigHandlers(bot: {
   command: (cmd: string, handler: (ctx: Context) => Promise<void>) => void;
 }, getCtx: () => HandlerContext): void {
 
-  // /set_rate <amount>
-  bot.command("set_rate", async (ctx) => {
+  // /setrate <amount>
+  bot.command("setrate", async (ctx) => {
     const userId = ctx.from?.id;
     if (!userId) return;
 
@@ -23,7 +23,7 @@ export function registerConfigHandlers(bot: {
     const rateStr = parts[1];
 
     if (!rateStr) {
-      await ctx.reply("❌ Usage: `/set_rate <amount>`\nExample: `/set_rate 50`", {
+      await ctx.reply("❌ Usage: `/setrate <amount>`\nExample: `/setrate 50`", {
         parse_mode: "Markdown",
       });
       return;
@@ -43,8 +43,8 @@ export function registerConfigHandlers(bot: {
     });
   });
 
-  // /set_address <address>
-  bot.command("set_address", async (ctx) => {
+  // /setaddress <address>
+  bot.command("setaddress", async (ctx) => {
     const userId = ctx.from?.id;
     if (!userId) return;
 
@@ -55,7 +55,7 @@ export function registerConfigHandlers(bot: {
 
     if (!address) {
       await ctx.reply(
-        "❌ Usage: `/set_address <USDT_address>`\nExample: `/set_address TXyz...`",
+        "❌ Usage: `/setaddress <USDT_address>`\nExample: `/setaddress TXyz...`",
         { parse_mode: "Markdown" }
       );
       return;

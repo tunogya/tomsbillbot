@@ -26,8 +26,8 @@ The bot uses a **stateless webhook-to-queue architecture** to decouple the fast 
 
 ### ⚙️ User Configuration (DM Commands)
 Send these in a direct message to the bot:
-- `/set_rate <amount>` — Set your hourly rate for invoicing (e.g., `/set_rate 50`).
-- `/set_address <address>` — Set your payment address (e.g., USDT address).
+- `/setrate <amount>` — Set your hourly rate for invoicing (e.g., `/setrate 50`).
+- `/setaddress <address>` — Set your payment address (e.g., USDT address).
 
 ### ⏱️ Work Tracking (Group Commands)
 - `/work` — Start a new work session in the current group. (Only one active session allowed per user per group).

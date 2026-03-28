@@ -34,7 +34,7 @@ export function registerInvoiceHandler(bot: {
 
     if (user.hourly_rate <= 0) {
       await ctx.reply(
-        "❌ Your hourly rate is not set. Use `/set_rate <amount>` first.",
+        "❌ Your hourly rate is not set. Use `/setrate <amount>` first.",
         { parse_mode: "Markdown" }
       );
       return;
