@@ -14,6 +14,7 @@ import { registerWorkHandlers } from "./handlers/work";
 import { registerInvoiceHandler } from "./handlers/invoice";
 import { registerPaymentHandler } from "./handlers/payment";
 import { registerResetHandler } from "./handlers/reset";
+import { registerChatCleanupHandler } from "./handlers/chatCleanup";
 import type { HandlerContext } from "./env";
 
 /**
@@ -36,6 +37,7 @@ export function createBot(
   registerInvoiceHandler(bot, getCtx);
   registerPaymentHandler(bot, getCtx);
   registerResetHandler(bot, getCtx);
+  registerChatCleanupHandler(bot, getCtx);
 
   // Catch-all for unhandled errors in handlers
   bot.catch((err) => {
