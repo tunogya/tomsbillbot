@@ -1,8 +1,8 @@
-# BillBot 💸
+# Tom's Bill Bot 🎩💸
 
-A high-concurrency, serverless Telegram bot built on Cloudflare Workers for tracking work hours and invoicing. 
+Howdy! 🐴 I'm **Tom's Bill Bot**, your personal, high-concurrency, serverless Telegram assistant built on Cloudflare Workers for tracking work hours and invoicing. 
 
-BillBot is designed to help freelancers or teams track time across different Telegram groups, ensure exact idempotent updates, and manage crypto-invoicing seamlessly without worrying about bot scaling issues.
+I'm designed to help freelancers and teams clock time across different Telegram groups, ensure exact idempotent updates, and manage crypto-invoicing seamlessly—all without breaking a sweat over scaling issues! 🤖
 
 ## 🏗️ Architecture & Tech Stack
 
@@ -18,14 +18,14 @@ The bot uses a **stateless webhook-to-queue architecture** to decouple the fast 
 ### The Request Flow
 1. **Webhook Receiver:** Telegram sends an update `POST /webhook` to the Hono app. The app verifies the webhook secret, pushes the raw update to a Cloudflare Queue, and immediately responds with HTTP 200 to prevent Telegram from retrying.
 2. **Queue Consumer:** The Cloudflare Queue processes batches of updates in the background.
-3. **Idempotency Check:** Before processing, the bot checks `update_id` against KV storage. If it's a duplicate, it's skipped.
-4. **Execution:** The grammY bot executes command logic against the D1 database.
+3. **Idempotency Check:** Before processing, I check the `update_id` against KV storage. If it's a duplicate, I skip it!
+4. **Execution:** My trusty grammY core executes command logic against the D1 database.
 5. **Concurrency Safety:** Active work sessions are protected by a `UNIQUE` partial index in the SQLite database to prevent race conditions during concurrent `/work` commands.
 
 ## ✨ Features and Commands
 
 ### ⚙️ User Configuration (DM Commands)
-Send these in a direct message to the bot:
+Send these in a direct message to me (Tom's Bill Bot!):
 - `/setrate <amount>` — Set your hourly rate for invoicing (e.g., `/setrate 50`).
 - `/setaddress <address>` — Set your payment address (e.g., USDT address).
 
