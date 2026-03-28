@@ -21,7 +21,7 @@ export function registerPaymentHandler(bot: {
     if (!userId || !chatId) return;
 
     if (ctx.chat.type === "private") {
-      await ctx.reply("The `/paid` command can only be used in group chats.", {
+      await ctx.reply("Hey there! 🤖 Tom's Bill Bot needs to be in a group chat to process the `/paid` command.", {
         parse_mode: "Markdown",
       });
       return;
@@ -33,7 +33,7 @@ export function registerPaymentHandler(bot: {
     const amountStr = parts[1];
 
     if (!amountStr) {
-      await ctx.reply("Usage: `/paid <amount>`\nExample: `/paid 100`", {
+      await ctx.reply("Hold your horses! 🐴 Usage: `/paid <amount>`\nExample: `/paid 100`", {
         parse_mode: "Markdown",
       });
       return;
@@ -41,7 +41,7 @@ export function registerPaymentHandler(bot: {
 
     const amount = parseFloat(amountStr);
     if (isNaN(amount) || amount <= 0) {
-      await ctx.reply("Please provide a valid positive amount.");
+      await ctx.reply("Oops! Tom's Bill Bot needs a valid positive amount.");
       return;
     }
 
@@ -54,7 +54,7 @@ export function registerPaymentHandler(bot: {
     const unpaidAmount = totalInvoiced - totalPaid;
 
     const lines = [
-      `*Payment Recorded*`,
+      `*Payment Recorded by Tom's Bill Bot 💰*`,
       "",
       `• Payment ID: #${payment.id}`,
       `• Amount: \`$${amount.toFixed(2)}\``,
@@ -66,7 +66,7 @@ export function registerPaymentHandler(bot: {
     ];
 
     if (unpaidAmount <= 0) {
-      lines.push("", "All invoices are fully paid!");
+      lines.push("", "All invoices are fully paid! Tom's Bill Bot is happy! 🎉");
     }
 
     await ctx.reply(lines.join("\n"), { parse_mode: "Markdown" });

@@ -21,9 +21,9 @@ export function registerStartHandler(bot: {
     const user = await getUser(db, userId);
 
     const lines = [
-      "*Welcome to BillBot!*",
+      "*Welcome to Tom's Bill Bot! 🎩*",
       "",
-      "I help you track work hours and generate invoices.",
+      "I'm Tom's personal assistant, here to help you track work hours and manage those invoices with style.",
       "",
       "*Your Settings:*",
       `• Hourly Rate: \`$${user?.hourly_rate ?? 0}/hr\``,

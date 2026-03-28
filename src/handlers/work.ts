@@ -29,7 +29,7 @@ export function registerWorkHandlers(bot: {
     if (!userId || !chatId) return;
 
     if (ctx.chat.type === "private") {
-      await ctx.reply("The `/work` command can only be used in group chats.", {
+      await ctx.reply("Hey there! 🤖 Tom's Bill Bot can only process `/work` commands in group chats.", {
         parse_mode: "Markdown",
       });
       return;
@@ -45,7 +45,7 @@ export function registerWorkHandlers(bot: {
     const existing = await getActiveSession(db, userId, chatId);
     if (existing) {
       await ctx.reply(
-        `You already have an active session started at \`${existing.start_time}\`.\nUse /done to end it first.`,
+        `Tom's Bill Bot sees you're already grinding! 💼\nYou have an active session from \`${existing.start_time}\`.\nUse /done to clock out first.`,
         { parse_mode: "Markdown" }
       );
       return;
@@ -57,10 +57,10 @@ export function registerWorkHandlers(bot: {
 
       const userName = ctx.from?.first_name ?? "User";
       await ctx.reply(
-        `*Work session started!*\n\n` +
+        `*Work session started! Tom's Bill Bot is on the clock! ⏱️*\n\n` +
         `${userName}\n` +
         `Started: \`${session.start_time}\`\n\n` +
-        `Use /done when you're finished.`,
+        `Don't forget to use /done when you're finished.`,
         { parse_mode: "Markdown" }
       );
     } catch (err) {
@@ -69,7 +69,7 @@ export function registerWorkHandlers(bot: {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("UNIQUE constraint failed") || msg.includes("SQLITE_CONSTRAINT")) {
         await ctx.reply(
-          "You already have an active session. Use /done to end it first."
+          "Tom's Bill Bot says: You already have an active session. Use /done to clock out first."
         );
       } else {
         throw err;
@@ -84,7 +84,7 @@ export function registerWorkHandlers(bot: {
     if (!userId || !chatId) return;
 
     if (ctx.chat.type === "private") {
-      await ctx.reply("The `/done` command can only be used in group chats.", {
+      await ctx.reply("Hey there! 🤖 Tom's Bill Bot can only process `/done` commands in group chats.", {
         parse_mode: "Markdown",
       });
       return;
@@ -95,7 +95,7 @@ export function registerWorkHandlers(bot: {
     // Find active session
     const session = await getActiveSession(db, userId, chatId);
     if (!session) {
-      await ctx.reply("No active work session found. Use /work to start one.");
+      await ctx.reply("Tom's Bill Bot couldn't find an active work session! Use /work to clock in.");
       return;
     }
 
@@ -106,7 +106,7 @@ export function registerWorkHandlers(bot: {
 
     const userName = ctx.from?.first_name ?? "User";
     await ctx.reply(
-      `*Work session ended!*\n\n` +
+      `*Work session ended! Tom's Bill Bot says great job! 🏁*\n\n` +
       `${userName}\n` +
       `Start: \`${session.start_time}\`\n` +
       `End: \`${endTime}\`\n` +
