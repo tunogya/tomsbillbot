@@ -29,7 +29,7 @@
 	"queues": {
 		"producers": [
 			{
-				"binding": "Queue",
+				"binding": "MY_QUEUE",
 				"queue": "billbot"
 			}
 		],
