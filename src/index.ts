@@ -97,7 +97,7 @@ async function handleQueueBatch(
       }
 
       // Set the handler context for this update
-      currentCtx = { db: env.DB, kv: env.KV };
+      currentCtx = { db: env.DB, kv: env.KV, botToken: env.BOT_TOKEN };
 
       await bot.handleUpdate(update);
 

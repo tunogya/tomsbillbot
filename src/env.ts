@@ -16,4 +16,5 @@ export interface AppEnv {
 export interface HandlerContext {
   db: D1Database;
   kv: KVNamespace;
+  botToken: string;
 }

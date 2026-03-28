@@ -309,6 +309,38 @@ export async function getUninvoicedSessions(
   return result.results ?? [];
 }
 
+/** Get ALL active sessions in a chat (all users). Used by chatCleanup. */
+export async function getAllActiveSessionsByChat(
+  db: D1Database,
+  chatId: number
+): Promise<{ id: number; customer_id: number; start_time: number }[]> {
+  const result = await db
+    .prepare(
+      `SELECT id, customer_id, start_time FROM work_sessions
+       WHERE chat_id = ? AND status = 'active'`
+    )
+    .bind(chatId)
+    .all<{ id: number; customer_id: number; start_time: number }>();
+  return result.results ?? [];
+}
+
+/** Get all open invoices in a chat with customer name. Used by chatCleanup. */
+export async function getOpenInvoicesByChat(
+  db: D1Database,
+  chatId: number
+): Promise<(Invoice & { customer_name: string })[]> {
+  const result = await db
+    .prepare(
+      `SELECT i.*, c.name AS customer_name FROM invoices i
+       JOIN customers c ON i.customer_id = c.id
+       WHERE i.chat_id = ? AND i.status = 'open'
+       ORDER BY i.created DESC`
+    )
+    .bind(chatId)
+    .all<Invoice & { customer_name: string }>();
+  return result.results ?? [];
+}
+
 // ─── Invoice Operations ───────────────────────────────────────────
 
 /**
