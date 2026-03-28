@@ -4,18 +4,18 @@
  * /done — end a session
  *
  * Rules:
- * - One active session per user per group
+ * - One active session per customer per group
  * - Prevents duplicates via DB query check + UNIQUE partial index
  */
 
 import type { Context } from "grammy";
 import {
-  upsertUser,
+  upsertCustomer,
   getActiveSession,
   startWorkSession,
-  endWorkSession,
+  completeWorkSession,
 } from "../services/db";
-import { nowUTC, durationHours, formatHours } from "../utils/time";
+import { nowTs, durationMinutes, formatDuration, formatTimestamp } from "../utils/time";
 import type { HandlerContext } from "../env";
 
 export function registerWorkHandlers(bot: {
@@ -36,34 +36,30 @@ export function registerWorkHandlers(bot: {
     }
 
     const { db } = getCtx();
+    const userName = ctx.from?.first_name ?? "User";
 
-    // Ensure user exists
-    await upsertUser(db, userId);
+    // Ensure customer exists (cache Telegram display name)
+    await upsertCustomer(db, userId, userName);
 
-    // Check for existing active session (concurrency safety — also
-    // backed by UNIQUE partial index idx_active_session)
+    // Check for existing active session
     const existing = await getActiveSession(db, userId, chatId);
     if (existing) {
       await ctx.reply(
-        `Tom's Bill Bot sees you're already grinding! 💼\nYou have an active session from \`${existing.start_time}\`.\nUse /done to clock out first.`,
+        `Tom's Bill Bot sees you're already grinding! 💼\nYou have an active session from \`${formatTimestamp(existing.start_time)}\`.\nUse /done to clock out first.`,
         { parse_mode: "Markdown" }
       );
       return;
     }
 
     try {
-      // Start new session
       const session = await startWorkSession(db, userId, chatId);
 
-      const userName = ctx.from?.first_name ?? "User";
       await ctx.reply(
         `*Work session started! Tom's Bill Bot is on the clock! ⏱️*\n\n` +
         `Don't forget to use /done when you're finished.`,
         { parse_mode: "Markdown" }
       );
     } catch (err) {
-      // If the UNIQUE partial index rejects a duplicate insert,
-      // the user raced another /work command
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("UNIQUE constraint failed") || msg.includes("SQLITE_CONSTRAINT")) {
         await ctx.reply(
@@ -98,14 +94,13 @@ export function registerWorkHandlers(bot: {
     }
 
     // End session
-    const endTime = nowUTC();
-    const duration = durationHours(session.start_time, endTime);
-    await endWorkSession(db, session.id, endTime, duration);
+    const endTime = nowTs();
+    const duration = durationMinutes(session.start_time, endTime);
+    await completeWorkSession(db, session.id, endTime, duration);
 
-    const userName = ctx.from?.first_name ?? "User";
     await ctx.reply(
       `*Work session ended! Tom's Bill Bot says great job! 🏁*\n\n` +
-      `Duration: \`${formatHours(duration)} hours\``,
+      `Duration: \`${formatDuration(duration)} hours\``,
       { parse_mode: "Markdown" }
     );
   });

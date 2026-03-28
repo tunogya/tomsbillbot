@@ -1,11 +1,21 @@
 /**
- * User configuration handlers (DM commands).
- * /setrate <hourly_rate>
- * /setaddress <USDT_address>
+ * User configuration handlers.
+ * /setrate <hourly_rate>    — Set rate (dollars/hr → stored as cents)
+ * /setaddress <address>     — Set payment address
+ * /setremark <remark>       — Set invoice remark (stored in customer metadata)
  */
 
 import type { Context } from "grammy";
-import { upsertUser, setHourlyRate, setUserChatRate, setPaymentAddress, setUserRemark } from "../services/db";
+import {
+  upsertCustomer,
+  setDefaultUnitAmount,
+  setUnitAmount,
+  updateCustomerPaymentAddress,
+  getCustomer,
+  updateCustomerMetadata,
+  parseMetadata,
+} from "../services/db";
+import { formatAmount } from "../utils/time";
 import type { HandlerContext } from "../env";
 
 export function registerConfigHandlers(bot: {
@@ -29,8 +39,8 @@ export function registerConfigHandlers(bot: {
       return;
     }
 
-    const rate = parseFloat(rateStr);
-    if (isNaN(rate) || rate < 0) {
+    const rateDollars = parseFloat(rateStr);
+    if (isNaN(rateDollars) || rateDollars < 0) {
       await ctx.reply("Oops! Please provide a valid non-negative number for Tom's Bill Bot.");
       return;
     }
@@ -38,16 +48,19 @@ export function registerConfigHandlers(bot: {
     const chatId = ctx.chat?.id;
     if (!chatId) return;
 
-    await upsertUser(db, userId);
+    // Convert dollars to cents
+    const unitAmountCents = Math.round(rateDollars * 100);
+
+    await upsertCustomer(db, userId, ctx.from?.first_name);
 
     if (ctx.chat.type === "private") {
-      await setHourlyRate(db, userId, rate);
-      await ctx.reply(`Got it! ✍️ *Default* hourly rate set to \`$${rate}/hr\``, {
+      await setDefaultUnitAmount(db, userId, unitAmountCents);
+      await ctx.reply(`Got it! ✍️ *Default* hourly rate set to \`$${formatAmount(unitAmountCents)}/hr\``, {
         parse_mode: "Markdown",
       });
     } else {
-      await setUserChatRate(db, userId, chatId, rate);
-      await ctx.reply(`Got it! ✍️ *Group-specific* hourly rate set to \`$${rate}/hr\``, {
+      await setUnitAmount(db, userId, chatId, unitAmountCents);
+      await ctx.reply(`Got it! ✍️ *Group-specific* hourly rate set to \`$${formatAmount(unitAmountCents)}/hr\``, {
         parse_mode: "Markdown",
       });
     }
@@ -71,8 +84,8 @@ export function registerConfigHandlers(bot: {
       return;
     }
 
-    await upsertUser(db, userId);
-    await setPaymentAddress(db, userId, address);
+    await upsertCustomer(db, userId, ctx.from?.first_name);
+    await updateCustomerPaymentAddress(db, userId, address);
 
     await ctx.reply(`All set! 🏦 Payment address updated to \`${address}\``, {
       parse_mode: "Markdown",
@@ -101,8 +114,13 @@ export function registerConfigHandlers(bot: {
       return;
     }
 
-    await upsertUser(db, userId);
-    await setUserRemark(db, userId, remark);
+    await upsertCustomer(db, userId, ctx.from?.first_name);
+
+    // Read-modify-write metadata
+    const customer = await getCustomer(db, userId);
+    const metadata = customer ? parseMetadata(customer.metadata) : {};
+    metadata.remark = remark;
+    await updateCustomerMetadata(db, userId, metadata);
 
     await ctx.reply(`Noted! 📝 Invoice remark set to:\n\`${remark}\``, {
       parse_mode: "Markdown",

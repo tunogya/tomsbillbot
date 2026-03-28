@@ -1,14 +1,18 @@
 /**
  * Payment handler.
- * /paid <amount> — record a payment and update balance.
+ * /paid <amount> — record a payment.
+ *
+ * Flow (Stripe-inspired):
+ * 1. Parse dollar amount → convert to cents
+ * 2. Auto-link to latest open Invoice
+ * 3. Update Invoice status (open → paid when fully paid)
+ * 4. Create BalanceTransaction
+ * 5. Display payment receipt with balance
  */
 
 import type { Context } from "grammy";
-import {
-  recordPayment,
-  getTotalPayments,
-  getTotalInvoiced,
-} from "../services/db";
+import { recordPayment, getInvoiceSummary } from "../services/db";
+import { formatAmount } from "../utils/time";
 import type { HandlerContext } from "../env";
 
 export function registerPaymentHandler(bot: {
@@ -39,33 +43,43 @@ export function registerPaymentHandler(bot: {
       return;
     }
 
-    const amount = parseFloat(amountStr);
-    if (isNaN(amount) || amount <= 0) {
+    const dollars = parseFloat(amountStr);
+    if (isNaN(dollars) || dollars <= 0) {
       await ctx.reply("Oops! Tom's Bill Bot needs a valid positive amount.");
       return;
     }
 
-    // Record payment in this chat
-    const payment = await recordPayment(db, userId, chatId, amount);
+    // Convert dollars to cents
+    const amountCents = Math.round(dollars * 100);
 
-    // Calculate updated balance in this chat
-    const totalPaid = await getTotalPayments(db, userId, chatId);
-    const totalInvoiced = await getTotalInvoiced(db, userId, chatId);
-    const unpaidAmount = totalInvoiced - totalPaid;
+    // Record payment (auto-links to latest open invoice)
+    const { payment, invoice } = await recordPayment(db, userId, chatId, amountCents);
+
+    // Get updated balance
+    const summary = await getInvoiceSummary(db, userId, chatId);
+    const unpaid = summary.total_invoiced - summary.total_paid;
 
     const lines = [
       `*Payment Recorded by Tom's Bill Bot 💰*`,
       "",
       `• Payment ID: #${payment.id}`,
-      `• Amount: \`$${amount.toFixed(2)}\``,
-      "",
-      `*Updated Balance:*`,
-      `• Total Invoiced: \`$${totalInvoiced.toFixed(2)}\``,
-      `• Total Paid: \`$${totalPaid.toFixed(2)}\``,
-      `• Remaining: \`$${Math.max(0, unpaidAmount).toFixed(2)}\``,
+      `• Amount: \`$${formatAmount(amountCents)}\``,
+      `• Status: \`${payment.status.toUpperCase()}\``,
     ];
 
-    if (unpaidAmount <= 0) {
+    if (invoice) {
+      lines.push(`• Linked to Invoice #${invoice.id} (${invoice.status.toUpperCase()})`);
+    }
+
+    lines.push(
+      "",
+      `*Updated Balance:*`,
+      `• Total Invoiced: \`$${formatAmount(summary.total_invoiced)}\``,
+      `• Total Paid: \`$${formatAmount(summary.total_paid)}\``,
+      `• Remaining: \`$${formatAmount(Math.max(0, unpaid))}\``
+    );
+
+    if (unpaid <= 0) {
       lines.push("", "All invoices are fully paid! Tom's Bill Bot is happy! 🎉");
     }
 

@@ -1,344 +1,553 @@
 /**
- * Database service layer — all D1 queries encapsulated here.
- * No raw SQL in handlers.
+ * Database service layer — Stripe-inspired object model.
  *
- * Each function receives a D1Database instance explicitly
- * rather than relying on module-level state.
+ * All amounts are stored in cents (integer).
+ * All timestamps are Unix seconds (integer).
+ *
+ * Object hierarchy:
+ *   Customer → Price (per-group rate)
+ *   Customer → WorkSession → Invoice (via invoice_id)
+ *   Invoice  → InvoiceLineItem
+ *   Invoice  → Payment (via invoice_id)
+ *   All      → BalanceTransaction (unified ledger)
  */
 
-import { nowUTC } from "../utils/time";
+import { nowTs, computeAmount } from "../utils/time";
 
 // ─── Types ────────────────────────────────────────────────────────
 
-export interface User {
+export interface Customer {
   id: number;
-  hourly_rate: number;
+  name: string;
   payment_address: string;
-  remark: string;
+  currency: string;
+  metadata: string; // JSON string
+  created: number;
+  updated: number;
+}
+
+export interface Price {
+  id: number;
+  customer_id: number;
+  chat_id: number;
+  unit_amount: number; // cents per hour
+  currency: string;
+  created: number;
 }
 
 export interface WorkSession {
   id: number;
-  user_id: number;
+  customer_id: number;
   chat_id: number;
-  start_time: string;
-  end_time: string | null;
-  duration: number | null;
-  invoiced: number;
-}
-
-export interface UninvoicedSession {
-  id: number;
-  user_id: number;
-  chat_id: number;
-  start_time: string;
-  end_time: string;
-  duration: number;
+  status: string; // 'active' | 'completed'
+  start_time: number;
+  end_time: number | null;
+  duration_minutes: number | null;
+  invoice_id: number | null;
+  created: number;
 }
 
 export interface Invoice {
   id: number;
-  user_id: number;
+  customer_id: number;
   chat_id: number;
-  total_amount: number;
-  paid_amount: number;
-  created_at: string;
+  status: string; // 'draft' | 'open' | 'paid' | 'void'
+  currency: string;
+  subtotal: number; // cents
+  total: number; // cents
+  amount_paid: number; // cents
+  amount_due: number; // cents
+  description: string | null;
+  metadata: string;
+  period_start: number | null;
+  period_end: number | null;
+  created: number;
+  finalized_at: number | null;
+  paid_at: number | null;
+  voided_at: number | null;
+}
+
+export interface InvoiceLineItem {
+  id: number;
+  invoice_id: number;
+  description: string | null;
+  quantity: number; // minutes
+  unit_amount: number; // cents per hour
+  amount: number; // cents
+  work_session_id: number | null;
+  created: number;
 }
 
 export interface Payment {
   id: number;
-  user_id: number;
+  customer_id: number;
   chat_id: number;
-  amount: number;
-  created_at: string;
+  invoice_id: number | null;
+  amount: number; // cents
+  currency: string;
+  status: string; // 'succeeded' | 'refunded'
+  description: string | null;
+  metadata: string;
+  created: number;
 }
 
-// ─── User Operations ──────────────────────────────────────────────
+export interface BalanceTransaction {
+  id: number;
+  customer_id: number;
+  chat_id: number;
+  type: string; // 'invoice' | 'payment' | 'adjustment'
+  amount: number; // cents: positive = receivable, negative = received
+  currency: string;
+  description: string | null;
+  source_type: string | null;
+  source_id: number | null;
+  created: number;
+}
 
-export async function upsertUser(db: D1Database, userId: number): Promise<void> {
+// ─── Customer Operations ──────────────────────────────────────────
+
+export async function upsertCustomer(
+  db: D1Database,
+  customerId: number,
+  name?: string
+): Promise<void> {
+  const ts = nowTs();
   await db
-    .prepare(`INSERT INTO users (id) VALUES (?) ON CONFLICT(id) DO NOTHING`)
-    .bind(userId)
+    .prepare(
+      `INSERT INTO customers (id, name, created, updated)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         name = CASE WHEN EXCLUDED.name != '' THEN EXCLUDED.name ELSE customers.name END,
+         updated = EXCLUDED.updated`
+    )
+    .bind(customerId, name ?? "", ts, ts)
     .run();
 }
 
-export async function getUser(
+export async function getCustomer(
   db: D1Database,
-  userId: number
-): Promise<User | null> {
+  customerId: number
+): Promise<Customer | null> {
   const result = await db
-    .prepare(
-      `SELECT id, hourly_rate, payment_address, remark FROM users WHERE id = ?`
-    )
-    .bind(userId)
-    .first<User>();
+    .prepare(`SELECT * FROM customers WHERE id = ?`)
+    .bind(customerId)
+    .first<Customer>();
   return result ?? null;
 }
 
-export async function setHourlyRate(
+export async function updateCustomerPaymentAddress(
   db: D1Database,
-  userId: number,
-  rate: number
-): Promise<void> {
-  await db
-    .prepare(`UPDATE users SET hourly_rate = ? WHERE id = ?`)
-    .bind(rate, userId)
-    .run();
-}
-
-export async function setPaymentAddress(
-  db: D1Database,
-  userId: number,
+  customerId: number,
   address: string
 ): Promise<void> {
+  const ts = nowTs();
   await db
-    .prepare(`UPDATE users SET payment_address = ? WHERE id = ?`)
-    .bind(address, userId)
+    .prepare(`UPDATE customers SET payment_address = ?, updated = ? WHERE id = ?`)
+    .bind(address, ts, customerId)
     .run();
 }
 
-export async function setUserRemark(
+export async function updateCustomerMetadata(
   db: D1Database,
-  userId: number,
-  remark: string
+  customerId: number,
+  metadata: Record<string, string>
 ): Promise<void> {
+  const ts = nowTs();
   await db
-    .prepare(`UPDATE users SET remark = ? WHERE id = ?`)
-    .bind(remark, userId)
+    .prepare(`UPDATE customers SET metadata = ?, updated = ? WHERE id = ?`)
+    .bind(JSON.stringify(metadata), ts, customerId)
     .run();
 }
 
-export async function getUserChatRate(
+/** Helper: parse metadata JSON from customer record. */
+export function parseMetadata(raw: string): Record<string, string> {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+// ─── Price Operations ─────────────────────────────────────────────
+
+/**
+ * Get unit amount (cents/hour) for a customer in a chat.
+ * Falls back to the global default (chat_id = 0) if no group-specific price exists.
+ */
+export async function getUnitAmount(
   db: D1Database,
-  userId: number,
+  customerId: number,
   chatId: number
 ): Promise<number> {
-  // First, check for group-specific rate
+  // Try group-specific price first
   const specific = await db
-    .prepare(
-      `SELECT hourly_rate FROM user_chat_settings WHERE user_id = ? AND chat_id = ?`
-    )
-    .bind(userId, chatId)
-    .first<{ hourly_rate: number }>();
+    .prepare(`SELECT unit_amount FROM prices WHERE customer_id = ? AND chat_id = ?`)
+    .bind(customerId, chatId)
+    .first<{ unit_amount: number }>();
 
-  if (specific) return specific.hourly_rate;
+  if (specific) return specific.unit_amount;
 
-  // Fallback to default user rate
-  const user = await getUser(db, userId);
-  return user?.hourly_rate ?? 0;
+  // Fall back to global default (chat_id = 0)
+  const defaultPrice = await db
+    .prepare(`SELECT unit_amount FROM prices WHERE customer_id = ? AND chat_id = 0`)
+    .bind(customerId)
+    .first<{ unit_amount: number }>();
+
+  return defaultPrice?.unit_amount ?? 0;
 }
 
-export async function setUserChatRate(
+/** Set unit amount for a specific group. */
+export async function setUnitAmount(
   db: D1Database,
-  userId: number,
+  customerId: number,
   chatId: number,
-  rate: number
+  unitAmount: number
 ): Promise<void> {
+  const ts = nowTs();
   await db
     .prepare(
-      `INSERT INTO user_chat_settings (user_id, chat_id, hourly_rate)
-       VALUES (?, ?, ?)
-       ON CONFLICT(user_id, chat_id) DO UPDATE SET hourly_rate = EXCLUDED.hourly_rate`
+      `INSERT INTO prices (customer_id, chat_id, unit_amount, currency, created)
+       VALUES (?, ?, ?, 'USD', ?)
+       ON CONFLICT(customer_id, chat_id) DO UPDATE SET unit_amount = EXCLUDED.unit_amount`
     )
-    .bind(userId, chatId, rate)
+    .bind(customerId, chatId, unitAmount, ts)
     .run();
+}
+
+/** Set global default unit amount (chat_id = 0). */
+export async function setDefaultUnitAmount(
+  db: D1Database,
+  customerId: number,
+  unitAmount: number
+): Promise<void> {
+  await setUnitAmount(db, customerId, 0, unitAmount);
+}
+
+/** Get the global default unit amount for display in /start. */
+export async function getDefaultUnitAmount(
+  db: D1Database,
+  customerId: number
+): Promise<number> {
+  const result = await db
+    .prepare(`SELECT unit_amount FROM prices WHERE customer_id = ? AND chat_id = 0`)
+    .bind(customerId)
+    .first<{ unit_amount: number }>();
+  return result?.unit_amount ?? 0;
 }
 
 // ─── Work Session Operations ──────────────────────────────────────
 
 export async function getActiveSession(
   db: D1Database,
-  userId: number,
+  customerId: number,
   chatId: number
-): Promise<{ id: number; start_time: string } | null> {
+): Promise<{ id: number; start_time: number } | null> {
   const result = await db
     .prepare(
       `SELECT id, start_time FROM work_sessions
-       WHERE user_id = ? AND chat_id = ? AND end_time IS NULL
+       WHERE customer_id = ? AND chat_id = ? AND status = 'active'
        LIMIT 1`
     )
-    .bind(userId, chatId)
-    .first<{ id: number; start_time: string }>();
+    .bind(customerId, chatId)
+    .first<{ id: number; start_time: number }>();
   return result ?? null;
 }
 
 /**
- * Starts a work session using INSERT ... RETURNING.
- * The UNIQUE partial index (idx_active_session) on work_sessions prevents
- * duplicate active sessions at the DB level even under concurrent writes.
+ * Start a new work session.
+ * The UNIQUE partial index (idx_active_session) prevents duplicates at the DB level.
  */
 export async function startWorkSession(
   db: D1Database,
-  userId: number,
+  customerId: number,
   chatId: number
-): Promise<{ id: number; start_time: string }> {
-  const startTime = nowUTC();
+): Promise<{ id: number; start_time: number }> {
+  const ts = nowTs();
   const result = await db
     .prepare(
-      `INSERT INTO work_sessions (user_id, chat_id, start_time)
-       VALUES (?, ?, ?)
+      `INSERT INTO work_sessions (customer_id, chat_id, status, start_time, created)
+       VALUES (?, ?, 'active', ?, ?)
        RETURNING id, start_time`
     )
-    .bind(userId, chatId, startTime)
-    .first<{ id: number; start_time: string }>();
+    .bind(customerId, chatId, ts, ts)
+    .first<{ id: number; start_time: number }>();
 
-  if (!result) {
-    throw new Error("Failed to create work session");
-  }
+  if (!result) throw new Error("Failed to create work session");
   return result;
 }
 
-export async function endWorkSession(
+/** Complete a work session. */
+export async function completeWorkSession(
   db: D1Database,
   sessionId: number,
-  endTime: string,
-  duration: number
+  endTime: number,
+  durationMins: number
 ): Promise<void> {
   await db
     .prepare(
-      `UPDATE work_sessions SET end_time = ?, duration = ? WHERE id = ?`
+      `UPDATE work_sessions
+       SET status = 'completed', end_time = ?, duration_minutes = ?
+       WHERE id = ?`
     )
-    .bind(endTime, duration, sessionId)
+    .bind(endTime, durationMins, sessionId)
     .run();
+}
+
+/** Get completed sessions not yet linked to any invoice. */
+export async function getUninvoicedSessions(
+  db: D1Database,
+  customerId: number,
+  chatId: number
+): Promise<WorkSession[]> {
+  const result = await db
+    .prepare(
+      `SELECT * FROM work_sessions
+       WHERE customer_id = ? AND chat_id = ?
+         AND status = 'completed' AND invoice_id IS NULL
+       ORDER BY start_time ASC`
+    )
+    .bind(customerId, chatId)
+    .all<WorkSession>();
+  return result.results ?? [];
 }
 
 // ─── Invoice Operations ───────────────────────────────────────────
 
-export async function getUninvoicedSessions(
-  db: D1Database,
-  userId: number,
-  chatId: number
-): Promise<UninvoicedSession[]> {
-  const result = await db
-    .prepare(
-      `SELECT id, user_id, chat_id, start_time, end_time, duration
-       FROM work_sessions
-       WHERE user_id = ? AND chat_id = ? AND invoiced = 0 AND end_time IS NOT NULL`
-    )
-    .bind(userId, chatId)
-    .all<UninvoicedSession>();
-  return result.results ?? [];
-}
-
+/**
+ * Create an invoice from uninvoiced sessions.
+ *
+ * Flow (inspired by Stripe):
+ * 1. Create invoice record (status = 'open', auto-finalized)
+ * 2. Create invoice_line_items for each session
+ * 3. Link sessions to invoice (set invoice_id)
+ * 4. Create balance_transaction (receivable)
+ *
+ * Returns the created invoice.
+ */
 export async function createInvoice(
   db: D1Database,
-  userId: number,
+  customerId: number,
   chatId: number,
-  totalAmount: number
-): Promise<{ id: number }> {
-  const createdAt = nowUTC();
-  const result = await db
-    .prepare(
-      `INSERT INTO invoices (user_id, chat_id, total_amount, created_at)
-       VALUES (?, ?, ?, ?)
-       RETURNING id`
-    )
-    .bind(userId, chatId, totalAmount, createdAt)
-    .first<{ id: number }>();
+  sessions: WorkSession[],
+  unitAmount: number // cents per hour
+): Promise<Invoice> {
+  const ts = nowTs();
 
-  if (!result) {
-    throw new Error("Failed to create invoice");
+  // Calculate totals
+  let subtotal = 0;
+  const lineItems: { sessionId: number; minutes: number; amount: number; description: string }[] = [];
+
+  for (const s of sessions) {
+    const mins = s.duration_minutes ?? 0;
+    const amount = computeAmount(mins, unitAmount);
+    subtotal += amount;
+    lineItems.push({
+      sessionId: s.id,
+      minutes: mins,
+      amount,
+      description: `Work session #${s.id}`,
+    });
   }
-  return result;
-}
 
-export async function markSessionsInvoiced(
-  db: D1Database,
-  sessionIds: number[]
-): Promise<void> {
-  if (sessionIds.length === 0) return;
+  const total = subtotal;
+  const periodStart = sessions.length > 0 ? sessions[0].start_time : ts;
+  const periodEnd = sessions.length > 0 ? sessions[sessions.length - 1].end_time ?? ts : ts;
 
-  // D1 doesn't support array bindings, so we batch individual updates
-  const stmt = db.prepare(`UPDATE work_sessions SET invoiced = 1 WHERE id = ?`);
-  await db.batch(sessionIds.map((id) => stmt.bind(id)));
-}
-
-// ─── Payment Operations ──────────────────────────────────────────
-
-export async function recordPayment(
-  db: D1Database,
-  userId: number,
-  chatId: number,
-  amount: number
-): Promise<{ id: number }> {
-  const createdAt = nowUTC();
-  const result = await db
+  // Step 1: Insert invoice
+  const invoice = await db
     .prepare(
-      `INSERT INTO payments (user_id, chat_id, amount, created_at)
-       VALUES (?, ?, ?, ?)
-       RETURNING id`
+      `INSERT INTO invoices (
+        customer_id, chat_id, status, currency,
+        subtotal, total, amount_paid, amount_due,
+        period_start, period_end, created, finalized_at
+      ) VALUES (?, ?, 'open', 'USD', ?, ?, 0, ?, ?, ?, ?, ?)
+      RETURNING *`
     )
-    .bind(userId, chatId, amount, createdAt)
-    .first<{ id: number }>();
+    .bind(customerId, chatId, subtotal, total, total, periodStart, periodEnd, ts, ts)
+    .first<Invoice>();
 
-  if (!result) {
-    throw new Error("Failed to record payment");
+  if (!invoice) throw new Error("Failed to create invoice");
+
+  // Step 2 & 3: Batch insert line items + link sessions
+  const stmts: D1PreparedStatement[] = [];
+
+  for (const item of lineItems) {
+    stmts.push(
+      db
+        .prepare(
+          `INSERT INTO invoice_line_items (invoice_id, description, quantity, unit_amount, amount, work_session_id, created)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
+        )
+        .bind(invoice.id, item.description, item.minutes, unitAmount, item.amount, item.sessionId, ts)
+    );
+    stmts.push(
+      db
+        .prepare(`UPDATE work_sessions SET invoice_id = ? WHERE id = ?`)
+        .bind(invoice.id, item.sessionId)
+    );
   }
-  return result;
+
+  // Step 4: Create balance transaction (positive = amount receivable)
+  stmts.push(
+    db
+      .prepare(
+        `INSERT INTO balance_transactions (customer_id, chat_id, type, amount, currency, description, source_type, source_id, created)
+         VALUES (?, ?, 'invoice', ?, 'USD', ?, 'invoice', ?, ?)`
+      )
+      .bind(customerId, chatId, total, `Invoice #${invoice.id}`, invoice.id, ts)
+  );
+
+  if (stmts.length > 0) {
+    await db.batch(stmts);
+  }
+
+  return invoice;
 }
 
-export async function getLatestInvoice(
+/** Get the latest open invoice for auto-linking payments. */
+export async function getLatestOpenInvoice(
   db: D1Database,
-  userId: number,
+  customerId: number,
   chatId: number
 ): Promise<Invoice | null> {
   const result = await db
     .prepare(
-      `SELECT id, chat_id, total_amount, paid_amount, created_at
-       FROM invoices
-       WHERE user_id = ? AND chat_id = ?
-       ORDER BY created_at DESC
+      `SELECT * FROM invoices
+       WHERE customer_id = ? AND chat_id = ? AND status = 'open'
+       ORDER BY created DESC
        LIMIT 1`
     )
-    .bind(userId, chatId)
+    .bind(customerId, chatId)
     .first<Invoice>();
   return result ?? null;
 }
 
-export async function updateInvoicePaidAmount(
+/** Get aggregated balance: total invoiced vs total paid. */
+export async function getInvoiceSummary(
   db: D1Database,
-  invoiceId: number,
-  newPaidAmount: number
+  customerId: number,
+  chatId: number
+): Promise<{ total_invoiced: number; total_paid: number }> {
+  const invoiced = await db
+    .prepare(
+      `SELECT COALESCE(SUM(total), 0) as total
+       FROM invoices
+       WHERE customer_id = ? AND chat_id = ? AND status != 'void'`
+    )
+    .bind(customerId, chatId)
+    .first<{ total: number }>();
+
+  const paid = await db
+    .prepare(
+      `SELECT COALESCE(SUM(amount), 0) as total
+       FROM payments
+       WHERE customer_id = ? AND chat_id = ? AND status = 'succeeded'`
+    )
+    .bind(customerId, chatId)
+    .first<{ total: number }>();
+
+  return {
+    total_invoiced: invoiced?.total ?? 0,
+    total_paid: paid?.total ?? 0,
+  };
+}
+
+// ─── Payment Operations ──────────────────────────────────────────
+
+/**
+ * Record a payment.
+ *
+ * Flow (inspired by Stripe):
+ * 1. Find the latest open invoice for this customer/chat
+ * 2. Create payment record (linked to invoice if found)
+ * 3. If linked, update invoice's amount_paid / amount_due / status
+ * 4. Create balance_transaction (negative = received)
+ *
+ * Returns the created payment and updated invoice (if any).
+ */
+export async function recordPayment(
+  db: D1Database,
+  customerId: number,
+  chatId: number,
+  amountCents: number
+): Promise<{ payment: Payment; invoice: Invoice | null }> {
+  const ts = nowTs();
+
+  // Step 1: Find latest open invoice
+  const openInvoice = await getLatestOpenInvoice(db, customerId, chatId);
+  const invoiceId = openInvoice?.id ?? null;
+
+  // Step 2: Insert payment
+  const payment = await db
+    .prepare(
+      `INSERT INTO payments (customer_id, chat_id, invoice_id, amount, currency, status, created)
+       VALUES (?, ?, ?, ?, 'USD', 'succeeded', ?)
+       RETURNING *`
+    )
+    .bind(customerId, chatId, invoiceId, amountCents, ts)
+    .first<Payment>();
+
+  if (!payment) throw new Error("Failed to record payment");
+
+  const stmts: D1PreparedStatement[] = [];
+  let updatedInvoice: Invoice | null = null;
+
+  // Step 3: Update invoice if linked
+  if (openInvoice && invoiceId) {
+    const newPaid = openInvoice.amount_paid + amountCents;
+    const newDue = Math.max(0, openInvoice.total - newPaid);
+    const newStatus = newDue <= 0 ? "paid" : "open";
+    const paidAt = newStatus === "paid" ? ts : null;
+
+    stmts.push(
+      db
+        .prepare(
+          `UPDATE invoices
+           SET amount_paid = ?, amount_due = ?, status = ?, paid_at = COALESCE(?, paid_at)
+           WHERE id = ?`
+        )
+        .bind(newPaid, newDue, newStatus, paidAt, invoiceId)
+    );
+
+    updatedInvoice = {
+      ...openInvoice,
+      amount_paid: newPaid,
+      amount_due: newDue,
+      status: newStatus,
+      paid_at: paidAt ?? openInvoice.paid_at,
+    };
+  }
+
+  // Step 4: Create balance transaction (negative = money received)
+  stmts.push(
+    db
+      .prepare(
+        `INSERT INTO balance_transactions (customer_id, chat_id, type, amount, currency, description, source_type, source_id, created)
+         VALUES (?, ?, 'payment', ?, 'USD', ?, 'payment', ?, ?)`
+      )
+      .bind(customerId, chatId, -amountCents, `Payment #${payment.id}`, payment.id, ts)
+  );
+
+  if (stmts.length > 0) {
+    await db.batch(stmts);
+  }
+
+  return { payment, invoice: updatedInvoice };
+}
+
+// ─── Reset Operations ────────────────────────────────────────────
+
+/** Delete all data for a specific group. */
+export async function resetGroupData(
+  db: D1Database,
+  chatId: number
 ): Promise<void> {
-  await db
-    .prepare(`UPDATE invoices SET paid_amount = ? WHERE id = ?`)
-    .bind(newPaidAmount, invoiceId)
-    .run();
-}
-
-export async function getTotalPayments(
-  db: D1Database,
-  userId: number,
-  chatId: number
-): Promise<number> {
-  const result = await db
-    .prepare(
-      `SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE user_id = ? AND chat_id = ?`
-    )
-    .bind(userId, chatId)
-    .first<{ total: number }>();
-  return result?.total ?? 0;
-}
-
-export async function getTotalInvoiced(
-  db: D1Database,
-  userId: number,
-  chatId: number
-): Promise<number> {
-  const result = await db
-    .prepare(
-      `SELECT COALESCE(SUM(total_amount), 0) as total FROM invoices WHERE user_id = ? AND chat_id = ?`
-    )
-    .bind(userId, chatId)
-    .first<{ total: number }>();
-  return result?.total ?? 0;
-}
-
-export async function resetGroupData(db: D1Database, chatId: number): Promise<void> {
-  // Reset all historical bills, work sessions, and payments for the given group
   await db.batch([
+    db.prepare(`DELETE FROM balance_transactions WHERE chat_id = ?`).bind(chatId),
+    db.prepare(`DELETE FROM invoice_line_items WHERE invoice_id IN (SELECT id FROM invoices WHERE chat_id = ?)`).bind(chatId),
     db.prepare(`DELETE FROM payments WHERE chat_id = ?`).bind(chatId),
     db.prepare(`DELETE FROM invoices WHERE chat_id = ?`).bind(chatId),
     db.prepare(`DELETE FROM work_sessions WHERE chat_id = ?`).bind(chatId),
+    db.prepare(`DELETE FROM prices WHERE chat_id = ?`).bind(chatId),
   ]);
 }

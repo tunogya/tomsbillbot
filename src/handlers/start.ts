@@ -1,10 +1,11 @@
 /**
  * /start command handler.
- * Ensures user exists in DB, sends welcome message.
+ * Ensures customer exists in DB, sends welcome message.
  */
 
 import type { Context } from "grammy";
-import { upsertUser, getUser } from "../services/db";
+import { upsertCustomer, getCustomer, getDefaultUnitAmount, parseMetadata } from "../services/db";
+import { formatAmount } from "../utils/time";
 import type { HandlerContext } from "../env";
 
 export function registerStartHandler(bot: {
@@ -16,9 +17,11 @@ export function registerStartHandler(bot: {
 
     const { db } = getCtx();
 
-    // Ensure user exists
-    await upsertUser(db, userId);
-    const user = await getUser(db, userId);
+    // Ensure customer exists
+    await upsertCustomer(db, userId, ctx.from?.first_name);
+    const customer = await getCustomer(db, userId);
+    const defaultRate = await getDefaultUnitAmount(db, userId);
+    const metadata = customer ? parseMetadata(customer.metadata) : {};
 
     const lines = [
       "*Welcome to Tom's Bill Bot! 🎩*",
@@ -26,16 +29,19 @@ export function registerStartHandler(bot: {
       "I'm Tom's personal assistant, here to help you track work hours and manage those invoices with style.",
       "",
       "*Your Settings:*",
-      `• Hourly Rate: \`$${user?.hourly_rate ?? 0}/hr\``,
-      `• Payment Address: \`${user?.payment_address || "not set"}\``,
+      `• Hourly Rate: \`$${formatAmount(defaultRate)}/hr\``,
+      `• Payment Address: \`${customer?.payment_address || "not set"}\``,
+      `• Remark: \`${metadata.remark || "not set"}\``,
       "",
       "*DM Commands:*",
       "`/setrate <amount>` — Set your hourly rate",
       "`/setaddress <address>` — Set your USDT address",
+      "`/setremark <text>` — Set invoice remark",
       "",
       "*Group Commands:*",
       "`/work` — Start a work session",
       "`/done` — End your current session",
+      "`/setrate <amount>` — Set a group-specific rate",
       "`/invoice` — Generate an invoice",
       "`/paid <amount>` — Record a payment",
       "`/reset` — Reset all historical data for the group",

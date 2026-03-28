@@ -1,35 +1,43 @@
 /**
- * Time utilities — all timestamps in UTC.
+ * Time & formatting utilities.
+ * All timestamps are Unix seconds (integer).
+ * All amounts are in cents (integer).
  */
 
-/** Returns current time as ISO 8601 UTC string. */
-export function nowUTC(): string {
-  return new Date().toISOString();
+/** Returns current time as Unix timestamp (seconds). */
+export function nowTs(): number {
+  return Math.floor(Date.now() / 1000);
 }
 
 /**
- * Computes duration in hours (float) between two ISO 8601 timestamps.
- * Returns 0 if inputs are invalid.
- * Billing rule: accurate to the minute, minimum 0.5 hours, and rounds up to the next 0.5 hours.
+ * Computes duration in minutes between two Unix timestamps.
+ * Billing rule: minimum 30 minutes, rounds up to the nearest 30-minute block.
  */
-export function durationHours(start: string, end: string): number {
-  const startMs = new Date(start).getTime();
-  const endMs = new Date(end).getTime();
-  if (isNaN(startMs) || isNaN(endMs) || endMs <= startMs) {
-    return 0;
-  }
-  
-  // Calculate exact minutes elapsed (ignoring leftover seconds)
-  const minutes = Math.floor((endMs - startMs) / 60000);
-  
-  // Less than 30 mins counts as 30 mins (0.5 hr).
-  // Over 30 mins but less than 60 mins counts as 1 hr.
-  // Effectively rounds up to the nearest 30 mins block (0.5 hr chunk).
-  const periods = Math.ceil(minutes / 30);
-  return Math.max(0.5, periods * 0.5);
+export function durationMinutes(startTs: number, endTs: number): number {
+  if (endTs <= startTs) return 0;
+  const exactMinutes = Math.floor((endTs - startTs) / 60);
+  const periods = Math.ceil(exactMinutes / 30);
+  return Math.max(30, periods * 30);
 }
 
-/** Formats a float hours value to 2 decimal places. */
-export function formatHours(hours: number): string {
-  return hours.toFixed(2);
+/**
+ * Computes amount in cents from duration (minutes) and unit price (cents/hour).
+ */
+export function computeAmount(minutes: number, unitAmountCentsPerHour: number): number {
+  return Math.round(minutes * unitAmountCentsPerHour / 60);
+}
+
+/** Formats cents as a dollar string, e.g. 5000 → "50.00". */
+export function formatAmount(cents: number): string {
+  return (cents / 100).toFixed(2);
+}
+
+/** Formats minutes as hours string, e.g. 90 → "1.50". */
+export function formatDuration(minutes: number): string {
+  return (minutes / 60).toFixed(2);
+}
+
+/** Formats a Unix timestamp as ISO 8601 UTC string. */
+export function formatTimestamp(ts: number): string {
+  return new Date(ts * 1000).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC");
 }

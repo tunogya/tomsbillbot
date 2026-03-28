@@ -1,19 +1,26 @@
 /**
  * Invoice handler.
- * /invoice — compute total hours (uninvoiced), generate invoice.
+ * /invoice — generate an invoice from uninvoiced work sessions.
+ *
+ * Flow (Stripe-inspired):
+ * 1. Get uninvoiced completed sessions
+ * 2. Get unit price for this customer in this chat
+ * 3. Create Invoice (status='open') with InvoiceLineItems
+ * 4. Link sessions to invoice
+ * 5. Create BalanceTransaction
+ * 6. Display invoice with balance summary
  */
 
 import type { Context } from "grammy";
 import {
-  getUser,
-  getUserChatRate,
+  getCustomer,
+  getUnitAmount,
   getUninvoicedSessions,
   createInvoice,
-  markSessionsInvoiced,
-  getTotalPayments,
-  getTotalInvoiced,
+  getInvoiceSummary,
+  parseMetadata,
 } from "../services/db";
-import { formatHours } from "../utils/time";
+import { formatAmount, formatDuration } from "../utils/time";
 import type { HandlerContext } from "../env";
 
 export function registerInvoiceHandler(bot: {
@@ -34,12 +41,13 @@ export function registerInvoiceHandler(bot: {
 
     const { db } = getCtx();
 
-    // Get user config
-    const user = await getUser(db, userId);
-    // Get specific rate for this chat
-    const rate = await getUserChatRate(db, userId, chatId);
+    // Get customer
+    const customer = await getCustomer(db, userId);
 
-    if (rate <= 0) {
+    // Get unit price (cents/hour) for this chat
+    const unitAmount = await getUnitAmount(db, userId, chatId);
+
+    if (unitAmount <= 0) {
       await ctx.reply(
         "Tom's Bill Bot noticed your hourly rate for this chat is missing! 🧐 Use `/setrate <amount>` first.",
         { parse_mode: "Markdown" }
@@ -54,42 +62,38 @@ export function registerInvoiceHandler(bot: {
       return;
     }
 
-    // Calculate totals
-    const totalHours = sessions.reduce((sum, s) => sum + (s.duration ?? 0), 0);
-    const totalAmount = totalHours * rate;
+    // Create invoice with line items
+    const invoice = await createInvoice(db, userId, chatId, sessions, unitAmount);
 
-    // Create invoice record
-    const invoice = await createInvoice(db, userId, chatId, totalAmount);
+    // Get overall balance
+    const summary = await getInvoiceSummary(db, userId, chatId);
+    const unpaid = summary.total_invoiced - summary.total_paid;
 
-    // Mark sessions as invoiced
-    const sessionIds = sessions.map((s) => s.id);
-    await markSessionsInvoiced(db, sessionIds);
-
-    // Get payment history for balance in this chat
-    const totalPaid = await getTotalPayments(db, userId, chatId);
-    const totalInvoiced = await getTotalInvoiced(db, userId, chatId);
-    const unpaidAmount = totalInvoiced - totalPaid;
+    // Calculate total hours for display
+    const totalMinutes = sessions.reduce((sum, s) => sum + (s.duration_minutes ?? 0), 0);
 
     const lines = [
       `*Tom's Bill Bot presents Invoice #${invoice.id} 🧾*`,
+      `• Status: \`${invoice.status.toUpperCase()}\``,
       `• Sessions: ${sessions.length}`,
-      `• Total Hours: \`${formatHours(totalHours)}\``,
-      `• Rate: \`${rate}/hr\``,
-      `• Amount: \`$${totalAmount.toFixed(2)}\``,
+      `• Total Hours: \`${formatDuration(totalMinutes)}\``,
+      `• Rate: \`$${formatAmount(unitAmount)}/hr\``,
+      `• Amount: \`$${formatAmount(invoice.total)}\``,
       "",
       `*Balance:*`,
-      `• Total Invoiced: \`$${totalInvoiced.toFixed(2)}\``,
-      `• Total Paid: \`$${totalPaid.toFixed(2)}\``,
+      `• Total Invoiced: \`$${formatAmount(summary.total_invoiced)}\``,
+      `• Total Paid: \`$${formatAmount(summary.total_paid)}\``,
       "",
-      `• Unpaid: \`$${unpaidAmount.toFixed(2)}\``,
+      `• Unpaid: \`$${formatAmount(Math.max(0, unpaid))}\``,
     ];
 
-    if (user?.payment_address) {
-      lines.push("", `Pay to: \`${user.payment_address}\``);
+    if (customer?.payment_address) {
+      lines.push("", `Pay to: \`${customer.payment_address}\``);
     }
 
-    if (user?.remark) {
-      lines.push(`Remark: ${user.remark}`);
+    const metadata = customer ? parseMetadata(customer.metadata) : {};
+    if (metadata.remark) {
+      lines.push(`Remark: ${metadata.remark}`);
     }
 
     await ctx.reply(lines.join("\n"), { parse_mode: "Markdown" });
