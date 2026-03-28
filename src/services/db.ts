@@ -14,6 +14,7 @@ export interface User {
   id: number;
   hourly_rate: number;
   payment_address: string;
+  remark: string;
 }
 
 export interface WorkSession {
@@ -66,7 +67,9 @@ export async function getUser(
   userId: number
 ): Promise<User | null> {
   const result = await db
-    .prepare(`SELECT id, hourly_rate, payment_address FROM users WHERE id = ?`)
+    .prepare(
+      `SELECT id, hourly_rate, payment_address, remark FROM users WHERE id = ?`
+    )
     .bind(userId)
     .first<User>();
   return result ?? null;
@@ -91,6 +94,17 @@ export async function setPaymentAddress(
   await db
     .prepare(`UPDATE users SET payment_address = ? WHERE id = ?`)
     .bind(address, userId)
+    .run();
+}
+
+export async function setUserRemark(
+  db: D1Database,
+  userId: number,
+  remark: string
+): Promise<void> {
+  await db
+    .prepare(`UPDATE users SET remark = ? WHERE id = ?`)
+    .bind(remark, userId)
     .run();
 }
 

@@ -89,6 +89,10 @@ export function registerInvoiceHandler(bot: {
       lines.push("", `💳 Pay to: \`${user.payment_address}\``);
     }
 
+    if (user?.remark) {
+      lines.push(`📝 Remark: ${user.remark}`);
+    }
+
     await ctx.reply(lines.join("\n"), { parse_mode: "Markdown" });
   });
 }

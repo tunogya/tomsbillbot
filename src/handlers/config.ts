@@ -5,7 +5,7 @@
  */
 
 import type { Context } from "grammy";
-import { upsertUser, setHourlyRate, setUserChatRate, setPaymentAddress } from "../services/db";
+import { upsertUser, setHourlyRate, setUserChatRate, setPaymentAddress, setUserRemark } from "../services/db";
 import type { HandlerContext } from "../env";
 
 export function registerConfigHandlers(bot: {
@@ -75,6 +75,36 @@ export function registerConfigHandlers(bot: {
     await setPaymentAddress(db, userId, address);
 
     await ctx.reply(`✅ Payment address set to \`${address}\``, {
+      parse_mode: "Markdown",
+    });
+  });
+
+  // /setremark <remark>
+  bot.command("setremark", async (ctx) => {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+
+    if (!ctx.chat || ctx.chat.type !== "private") {
+      await ctx.reply("❌ The `/setremark` command can only be used in DMs.");
+      return;
+    }
+
+    const { db } = getCtx();
+    const text = ctx.message?.text ?? "";
+    const remark = text.replace(/^\/setremark\s*/, "").trim();
+
+    if (!remark) {
+      await ctx.reply(
+        "❌ Usage: `/setremark <remark_text>`\nExample: `/setremark Network: TRC20`",
+        { parse_mode: "Markdown" }
+      );
+      return;
+    }
+
+    await upsertUser(db, userId);
+    await setUserRemark(db, userId, remark);
+
+    await ctx.reply(`✅ Invoice remark set to:\n\`${remark}\``, {
       parse_mode: "Markdown",
     });
   });
