@@ -38,6 +38,7 @@ export function registerStartHandler(bot: {
       "`/done` — End your current session",
       "`/invoice` — Generate an invoice",
       "`/paid <amount>` — Record a payment",
+      "`/reset` — Reset all historical data for the group",
     ];
 
     await ctx.reply(lines.join("\n"), { parse_mode: "Markdown" });

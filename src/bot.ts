@@ -13,6 +13,7 @@ import { registerConfigHandlers } from "./handlers/config";
 import { registerWorkHandlers } from "./handlers/work";
 import { registerInvoiceHandler } from "./handlers/invoice";
 import { registerPaymentHandler } from "./handlers/payment";
+import { registerResetHandler } from "./handlers/reset";
 import type { HandlerContext } from "./env";
 
 /**
@@ -34,6 +35,7 @@ export function createBot(
   registerWorkHandlers(bot, getCtx);
   registerInvoiceHandler(bot, getCtx);
   registerPaymentHandler(bot, getCtx);
+  registerResetHandler(bot, getCtx);
 
   // Catch-all for unhandled errors in handlers
   bot.catch((err) => {

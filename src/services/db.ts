@@ -333,3 +333,12 @@ export async function getTotalInvoiced(
     .first<{ total: number }>();
   return result?.total ?? 0;
 }
+
+export async function resetGroupData(db: D1Database, chatId: number): Promise<void> {
+  // Reset all historical bills, work sessions, and payments for the given group
+  await db.batch([
+    db.prepare(`DELETE FROM payments WHERE chat_id = ?`).bind(chatId),
+    db.prepare(`DELETE FROM invoices WHERE chat_id = ?`).bind(chatId),
+    db.prepare(`DELETE FROM work_sessions WHERE chat_id = ?`).bind(chatId),
+  ]);
+}

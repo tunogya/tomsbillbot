@@ -36,6 +36,7 @@ Send these in a direct message to the bot:
 ### 🧾 Invoicing & Payments
 - `/invoice` — Calculate all uninvoiced work time and generate an invoice based on your hourly rate.
 - `/paid <amount>` — Record a payment against your current unpaid balance.
+- `/reset` — Reset all historical data (work sessions, invoices, and payments) for the current group.
 
 ## 🚀 Getting Started
 
