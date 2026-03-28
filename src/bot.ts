@@ -7,7 +7,7 @@
  * without module-level mutable state.
  */
 
-import { Bot } from "grammy";
+import { Bot, Context } from "grammy";
 import { registerStartHandler } from "./handlers/start";
 import { registerConfigHandlers } from "./handlers/config";
 import { registerWorkHandlers } from "./handlers/work";
@@ -30,6 +30,23 @@ export function createBot(
   getCtx: () => HandlerContext
 ): Bot {
   const bot = new Bot(token);
+
+  // Global middleware to force "reply" (quote) on all responses in groups
+  bot.use(async (ctx, next) => {
+    if (ctx.chat?.type !== "private" && ctx.message?.message_id) {
+      const prevReply = ctx.reply.bind(ctx);
+      ctx.reply = (text: string, other?: any, ...args: any[]) => {
+        if (other?.reply_parameters || other?.reply_to_message_id) {
+          return prevReply(text, other, ...args);
+        }
+        return prevReply(text, {
+          reply_parameters: { message_id: ctx.message!.message_id },
+          ...other,
+        }, ...args);
+      };
+    }
+    await next();
+  });
 
   // Register all command handlers
   registerStartHandler(bot, getCtx);
