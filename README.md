@@ -1,72 +1,106 @@
-# OpenAPI Template
+# BillBot 💸
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/templates/tree/main/chanfana-openapi-template)
+A high-concurrency, serverless Telegram bot built on Cloudflare Workers for tracking work hours and invoicing. 
 
-![OpenAPI Template Preview](https://imagedelivery.net/wSMYJvS3Xw-n339CbDyDIA/91076b39-1f5b-46f6-7f14-536a6f183000/public)
+BillBot is designed to help freelancers or teams track time across different Telegram groups, ensure exact idempotent updates, and manage crypto-invoicing seamlessly without worrying about bot scaling issues.
 
-<!-- dash-content-start -->
+## 🏗️ Architecture & Tech Stack
 
-This is a Cloudflare Worker with OpenAPI 3.1 Auto Generation and Validation using [chanfana](https://github.com/cloudflare/chanfana) and [Hono](https://github.com/honojs/hono).
+The bot uses a **stateless webhook-to-queue architecture** to decouple the fast ingestion of Telegram updates from the heavier processing logic (database transactions, external dependencies).
 
-This is an example project made to be used as a quick start into building OpenAPI compliant Workers that generates the
-`openapi.json` schema automatically from code and validates the incoming request to the defined parameters or request body.
+- **Runtime:** [Cloudflare Workers](https://workers.cloudflare.com/)
+- **Bot Framework:** [grammY](https://grammy.dev/)
+- **Webhook Router:** [Hono](https://hono.dev/)
+- **Database:** Cloudflare **D1** (Serverless SQLite)
+- **Message Broker:** Cloudflare **Queues**
+- **Idempotency Cache:** Cloudflare **KV**
 
-This template includes various endpoints, a D1 database, and integration tests using [Vitest](https://vitest.dev/) as examples. In endpoints, you will find [chanfana D1 AutoEndpoints](https://chanfana.com/endpoints/auto/d1) and a [normal endpoint](https://chanfana.com/endpoints/defining-endpoints) to serve as examples for your projects.
+### The Request Flow
+1. **Webhook Receiver:** Telegram sends an update `POST /webhook` to the Hono app. The app verifies the webhook secret, pushes the raw update to a Cloudflare Queue, and immediately responds with HTTP 200 to prevent Telegram from retrying.
+2. **Queue Consumer:** The Cloudflare Queue processes batches of updates in the background.
+3. **Idempotency Check:** Before processing, the bot checks `update_id` against KV storage. If it's a duplicate, it's skipped.
+4. **Execution:** The grammY bot executes command logic against the D1 database.
+5. **Concurrency Safety:** Active work sessions are protected by a `UNIQUE` partial index in the SQLite database to prevent race conditions during concurrent `/work` commands.
 
-Besides being able to see the OpenAPI schema (openapi.json) in the browser, you can also extract the schema locally no hassle by running this command `npm run schema`.
+## ✨ Features and Commands
 
-<!-- dash-content-end -->
+### ⚙️ User Configuration (DM Commands)
+Send these in a direct message to the bot:
+- `/set_rate <amount>` — Set your hourly rate for invoicing (e.g., `/set_rate 50`).
+- `/set_address <address>` — Set your payment address (e.g., USDT address).
 
-> [!IMPORTANT]
-> When using C3 to create this project, select "no" when it asks if you want to deploy. You need to follow this project's [setup steps](https://github.com/cloudflare/templates/tree/main/openapi-template#setup-steps) before deploying.
+### ⏱️ Work Tracking (Group Commands)
+- `/work` — Start a new work session in the current group. (Only one active session allowed per user per group).
+- `/done` — End your active work session and record the duration.
 
-## Getting Started
+### 🧾 Invoicing & Payments
+- `/invoice` — Calculate all uninvoiced work time and generate an invoice based on your hourly rate.
+- `/paid <amount>` — Record a payment against your current unpaid balance.
 
-Outside of this repo, you can start a new project with this template using [C3](https://developers.cloudflare.com/pages/get-started/c3/) (the `create-cloudflare` CLI):
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js & npm
+- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/)
+- A Telegram Bot Token from [@BotFather](https://t.me/botfather)
+
+### 1. Provision Cloudflare Resources
+You will need to create a D1 database, a KV namespace, and a Queue in your Cloudflare account.
 
 ```bash
-npm create cloudflare@latest -- --template=cloudflare/templates/openapi-template
+# Create D1 Database
+npx wrangler d1 create billbot-db
+
+# Create KV Namespace
+npx wrangler kv:namespace create KV
+
+# Create Queue
+npx wrangler queues create billbot
+```
+*Note: Update `wrangler.jsonc` with the generated IDs for your D1 database and KV namespace.*
+
+### 2. Apply Database Migrations
+Initialize your D1 database with the required tables and indexes:
+```bash
+npm run predeploy
+```
+*(Or use `npm run migrate:local` for local development).*
+
+### 3. Deploy the Worker
+Publish the worker to Cloudflare:
+```bash
+npm run deploy
 ```
 
-A live public deployment of this template is available at [https://openapi-template.templates.workers.dev](https://openapi-template.templates.workers.dev)
+### 4. Setup Secrets & Webhook
+Set your production secrets:
+```bash
+npx wrangler secret put BOT_TOKEN
+npx wrangler secret put BOT_SECRET
+```
+*(Where `BOT_SECRET` is a random string used to verify incoming webhooks).*
 
-## Setup Steps
+Finally, register your Webhook with Telegram:
+```text
+https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook?url=https://<YOUR_WORKER_DOMAIN>/webhook&secret_token=<YOUR_BOT_SECRET>
+```
 
-1. Install the project dependencies with a package manager of your choice:
-   ```bash
-   npm install
-   ```
-2. Create a [D1 database](https://developers.cloudflare.com/d1/get-started/) with the name "openapi-template-db":
-   ```bash
-   npx wrangler d1 create openapi-template-db
-   ```
-   ...and update the `database_id` field in `wrangler.json` with the new database ID.
-3. Run the following db migration to initialize the database (notice the `migrations` directory in this project):
-   ```bash
-   npx wrangler d1 migrations apply DB --remote
-   ```
-4. Deploy the project!
-   ```bash
-   npx wrangler deploy
-   ```
-5. Monitor your worker
-   ```bash
-   npx wrangler tail
-   ```
+## 🧪 Testing
 
-## Testing
-
-This template includes integration tests using [Vitest](https://vitest.dev/). To run the tests locally:
-
+The bot includes Vitest for integration testing. You can run tests without deploying using:
 ```bash
 npm run test
 ```
 
-Test files are located in the `tests/` directory, with examples demonstrating how to test your endpoints and database interactions.
+## 📜 Project Structure
 
-## Project structure
-
-1. Your main router is defined in `src/index.ts`.
-2. Each endpoint has its own file in `src/endpoints/`.
-3. Integration tests are located in the `tests/` directory.
-4. For more information read the [chanfana documentation](https://chanfana.com/), [Hono documentation](https://hono.dev/docs), and [Vitest documentation](https://vitest.dev/guide/).
+```text
+src/
+├── index.ts           # Hono router, Webhook handler, and Queue consumer logic
+├── env.ts             # Cloudflare bindings and Environment definitions
+├── bot.ts             # grammY bot initialization
+├── handlers/          # Telegram command handlers (start, config, work, invoice, payment)
+├── services/          # Database interaction layer (D1)
+└── utils/             # Utility functions (idempotency, time parsing)
+migrations/            # D1 SQLite schema migrations
+```
