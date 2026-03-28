@@ -9,6 +9,13 @@
 	"vars": {
 		"BOT_SECRET": "CHANGE_ME_TO_RANDOM_SECRET"
 	},
+	"routes": [
+		{
+			"pattern": "billbot.abandon.ai",
+			"zone_name": "abandon.ai",
+			"custom_domain": true
+		}
+	],
 	"d1_databases": [
 		{
 			"binding": "DB",
@@ -25,13 +32,13 @@
 	"queues": {
 		"producers": [
 			{
-				"binding": "MY_QUEUE",
-				"queue": "dbfb0972623f4924be12c13b2e3af655"
+				"binding": "Queue",
+				"queue": "billbot"
 			}
 		],
 		"consumers": [
 			{
-				"queue": "dbfb0972623f4924be12c13b2e3af655",
+				"queue": "billbot",
 				"max_batch_size": 10,
 				"dead_letter_queue": "my-queue-dlq"
 			}
