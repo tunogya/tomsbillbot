@@ -16,6 +16,21 @@ export function registerResetHandler(
       return;
     }
 
+    // Only group admins / creators can reset data
+    const userId = ctx.from?.id;
+    if (!userId) return;
+
+    try {
+      const member = await ctx.api.getChatMember(ctx.chat.id, userId);
+      if (member.status !== "creator" && member.status !== "administrator") {
+        await ctx.reply("🔒 Only group admins can reset billing data.");
+        return;
+      }
+    } catch {
+      await ctx.reply("⚠️ Unable to verify admin status. Please make sure the bot has permission to see group members.");
+      return;
+    }
+
     const chatId = ctx.chat.id;
     const { db } = getCtx();
 

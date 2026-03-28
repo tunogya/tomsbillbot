@@ -179,21 +179,19 @@ export async function getUnitAmount(
   customerId: number,
   chatId: number
 ): Promise<number> {
-  // Try group-specific price first
-  const specific = await db
-    .prepare(`SELECT unit_amount FROM prices WHERE customer_id = ? AND chat_id = ?`)
+  // Single query: try group-specific first, fall back to global default (chat_id = 0)
+  const result = await db
+    .prepare(
+      `SELECT COALESCE(
+        (SELECT unit_amount FROM prices WHERE customer_id = ?1 AND chat_id = ?2),
+        (SELECT unit_amount FROM prices WHERE customer_id = ?1 AND chat_id = 0),
+        0
+      ) AS unit_amount`
+    )
     .bind(customerId, chatId)
     .first<{ unit_amount: number }>();
 
-  if (specific) return specific.unit_amount;
-
-  // Fall back to global default (chat_id = 0)
-  const defaultPrice = await db
-    .prepare(`SELECT unit_amount FROM prices WHERE customer_id = ? AND chat_id = 0`)
-    .bind(customerId)
-    .first<{ unit_amount: number }>();
-
-  return defaultPrice?.unit_amount ?? 0;
+  return result?.unit_amount ?? 0;
 }
 
 /** Set unit amount for a specific group. */
@@ -428,27 +426,19 @@ export async function getInvoiceSummary(
   customerId: number,
   chatId: number
 ): Promise<{ total_invoiced: number; total_paid: number }> {
-  const invoiced = await db
+  // Single query: fetch both totals via subqueries to halve D1 round trips
+  const result = await db
     .prepare(
-      `SELECT COALESCE(SUM(total), 0) as total
-       FROM invoices
-       WHERE customer_id = ? AND chat_id = ? AND status != 'void'`
+      `SELECT
+        COALESCE((SELECT SUM(total) FROM invoices WHERE customer_id = ?1 AND chat_id = ?2 AND status != 'void'), 0) AS total_invoiced,
+        COALESCE((SELECT SUM(amount) FROM payments WHERE customer_id = ?1 AND chat_id = ?2 AND status = 'succeeded'), 0) AS total_paid`
     )
     .bind(customerId, chatId)
-    .first<{ total: number }>();
-
-  const paid = await db
-    .prepare(
-      `SELECT COALESCE(SUM(amount), 0) as total
-       FROM payments
-       WHERE customer_id = ? AND chat_id = ? AND status = 'succeeded'`
-    )
-    .bind(customerId, chatId)
-    .first<{ total: number }>();
+    .first<{ total_invoiced: number; total_paid: number }>();
 
   return {
-    total_invoiced: invoiced?.total ?? 0,
-    total_paid: paid?.total ?? 0,
+    total_invoiced: result?.total_invoiced ?? 0,
+    total_paid: result?.total_paid ?? 0,
   };
 }
 
