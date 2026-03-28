@@ -1,10 +1,6 @@
-/**
- * /start command handler.
- * Ensures customer exists in DB, sends welcome message.
- */
-
 import type { Context } from "grammy";
-import { upsertCustomer, getCustomer, getDefaultUnitAmount, parseMetadata } from "../services/db";
+import { upsertCustomer, getDefaultUnitAmount, parseMetadata } from "../services/db";
+import { getCachedCustomer } from "../utils/cache";
 import { formatAmount } from "../utils/time";
 import type { HandlerContext } from "../env";
 
@@ -15,11 +11,11 @@ export function registerStartHandler(bot: {
     const userId = ctx.from?.id;
     if (!userId) return;
 
-    const { db } = getCtx();
+    const { db, kv } = getCtx();
 
     // Ensure customer exists
     await upsertCustomer(db, userId, ctx.from?.first_name);
-    const customer = await getCustomer(db, userId);
+    const customer = await getCachedCustomer(kv, db, userId);
     const defaultRate = await getDefaultUnitAmount(db, userId);
     const metadata = customer ? parseMetadata(customer.metadata) : {};
 

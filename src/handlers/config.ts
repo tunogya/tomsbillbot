@@ -15,6 +15,7 @@ import {
   updateCustomerMetadata,
   parseMetadata,
 } from "../services/db";
+import { invalidateCustomerCache, invalidateRateCache } from "../utils/cache";
 import { formatAmount } from "../utils/time";
 import type { HandlerContext } from "../env";
 
@@ -27,7 +28,7 @@ export function registerConfigHandlers(bot: {
     const userId = ctx.from?.id;
     if (!userId) return;
 
-    const { db } = getCtx();
+    const { db, kv } = getCtx();
     const text = ctx.message?.text ?? "";
     const parts = text.split(/\s+/);
     const rateStr = parts[1];
@@ -55,11 +56,13 @@ export function registerConfigHandlers(bot: {
 
     if (ctx.chat.type === "private") {
       await setDefaultUnitAmount(db, userId, unitAmountCents);
+      await invalidateRateCache(kv, userId, 0);
       await ctx.reply(`Got it! ✍️ *Default* hourly rate set to \`$${formatAmount(unitAmountCents)}/hr\``, {
         parse_mode: "Markdown",
       });
     } else {
       await setUnitAmount(db, userId, chatId, unitAmountCents);
+      await invalidateRateCache(kv, userId, chatId);
       await ctx.reply(`Got it! ✍️ *Group-specific* hourly rate set to \`$${formatAmount(unitAmountCents)}/hr\``, {
         parse_mode: "Markdown",
       });
@@ -71,7 +74,7 @@ export function registerConfigHandlers(bot: {
     const userId = ctx.from?.id;
     if (!userId) return;
 
-    const { db } = getCtx();
+    const { db, kv } = getCtx();
     const text = ctx.message?.text ?? "";
     const parts = text.split(/\s+/);
     const address = parts[1];
@@ -86,6 +89,7 @@ export function registerConfigHandlers(bot: {
 
     await upsertCustomer(db, userId, ctx.from?.first_name);
     await updateCustomerPaymentAddress(db, userId, address);
+    await invalidateCustomerCache(kv, userId);
 
     await ctx.reply(`All set! 🏦 Payment address updated to \`${address}\``, {
       parse_mode: "Markdown",
@@ -102,7 +106,7 @@ export function registerConfigHandlers(bot: {
       return;
     }
 
-    const { db } = getCtx();
+    const { db, kv } = getCtx();
     const text = ctx.message?.text ?? "";
     const remark = text.replace(/^\/setremark\s*/, "").trim();
 
@@ -121,6 +125,7 @@ export function registerConfigHandlers(bot: {
     const metadata = customer ? parseMetadata(customer.metadata) : {};
     metadata.remark = remark;
     await updateCustomerMetadata(db, userId, metadata);
+    await invalidateCustomerCache(kv, userId);
 
     await ctx.reply(`Noted! 📝 Invoice remark set to:\n\`${remark}\``, {
       parse_mode: "Markdown",

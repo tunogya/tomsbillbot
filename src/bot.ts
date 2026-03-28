@@ -16,6 +16,7 @@ import { registerPaymentHandler } from "./handlers/payment";
 import { registerResetHandler } from "./handlers/reset";
 import { registerChatCleanupHandler } from "./handlers/chatCleanup";
 import { registerHelpHandler } from "./handlers/help";
+import { checkRateLimit } from "./utils/ratelimit";
 import type { HandlerContext } from "./env";
 
 /**
@@ -48,6 +49,20 @@ export function createBot(
     await next();
   });
 
+  // Rate limiting middleware — drop excessive commands
+  bot.use(async (ctx, next) => {
+    const userId = ctx.from?.id;
+    if (userId) {
+      const { kv } = getCtx();
+      const allowed = await checkRateLimit(kv, userId);
+      if (!allowed) {
+        await ctx.reply("🐴 Whoa there! You're sending commands too fast. Please slow down.");
+        return;
+      }
+    }
+    await next();
+  });
+
   // Register all command handlers
   registerStartHandler(bot, getCtx);
   registerConfigHandlers(bot, getCtx);
@@ -58,10 +73,16 @@ export function createBot(
   registerChatCleanupHandler(bot, getCtx);
   registerHelpHandler(bot);
 
-  // Catch-all for unhandled errors in handlers
-  bot.catch((err) => {
-    console.error("Bot handler error:", err);
+  // Catch-all for unhandled errors — notify user + log
+  bot.catch(async (err) => {
+    console.error("Bot handler error:", err.error);
+    try {
+      await err.ctx.reply("⚠️ Something went wrong. Please try again later.");
+    } catch {
+      // Ignore reply failure (e.g. bot was removed from group)
+    }
   });
 
   return bot;
 }
+

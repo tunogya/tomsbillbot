@@ -13,13 +13,12 @@
 
 import type { Context } from "grammy";
 import {
-  getCustomer,
-  getUnitAmount,
   getUninvoicedSessions,
   createInvoice,
   getInvoiceSummary,
   parseMetadata,
 } from "../services/db";
+import { getCachedCustomer, getCachedUnitAmount } from "../utils/cache";
 import { formatAmount, formatDuration } from "../utils/time";
 import type { HandlerContext } from "../env";
 
@@ -39,13 +38,13 @@ export function registerInvoiceHandler(bot: {
       return;
     }
 
-    const { db } = getCtx();
+    const { db, kv } = getCtx();
 
-    // Get customer
-    const customer = await getCustomer(db, userId);
+    // Get customer (cached)
+    const customer = await getCachedCustomer(kv, db, userId);
 
-    // Get unit price (cents/hour) for this chat
-    const unitAmount = await getUnitAmount(db, userId, chatId);
+    // Get unit price (cached, cents/hour) for this chat
+    const unitAmount = await getCachedUnitAmount(kv, db, userId, chatId);
 
     if (unitAmount <= 0) {
       await ctx.reply(

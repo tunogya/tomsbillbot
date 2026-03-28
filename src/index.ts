@@ -18,6 +18,7 @@
 import { Hono } from "hono";
 import { createBot } from "./bot";
 import { isDuplicate, markProcessed } from "./utils/idempotency";
+import { handleScheduled } from "./services/scheduled";
 import type { AppEnv, HandlerContext } from "./env";
 import type { Update } from "grammy/types";
 
@@ -119,13 +120,22 @@ async function handleQueueBatch(
 export default {
   // Handling HTTP Request Entry (Webhook)
   fetch: app.fetch,
-  // Entry point for processing Queue messages (consumer)
 
+  // Entry point for processing Queue messages (consumer)
   async queue(
     batch: MessageBatch<Update>,
     env: AppEnv,
     _ctx: ExecutionContext
   ): Promise<void> {
     await handleQueueBatch(batch, env);
+  },
+
+  // Cron Trigger — periodic maintenance tasks
+  async scheduled(
+    _event: ScheduledEvent,
+    env: AppEnv,
+    _ctx: ExecutionContext
+  ): Promise<void> {
+    await handleScheduled(env);
   },
 };
