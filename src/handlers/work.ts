@@ -58,8 +58,7 @@ export function registerWorkHandlers(bot: {
       const userName = ctx.from?.first_name ?? "User";
       await ctx.reply(
         `*Work session started! Tom's Bill Bot is on the clock! ⏱️*\n\n` +
-        `${userName}\n` +
-        `Started: \`${session.start_time}\`\n\n` +
+        `${userName}\n\n` +
         `Don't forget to use /done when you're finished.`,
         { parse_mode: "Markdown" }
       );
@@ -107,9 +106,7 @@ export function registerWorkHandlers(bot: {
     const userName = ctx.from?.first_name ?? "User";
     await ctx.reply(
       `*Work session ended! Tom's Bill Bot says great job! 🏁*\n\n` +
-      `${userName}\n` +
-      `Start: \`${session.start_time}\`\n` +
-      `End: \`${endTime}\`\n` +
+      `${userName}\n\n` +
       `Duration: \`${formatHours(duration)} hours\``,
       { parse_mode: "Markdown" }
     );

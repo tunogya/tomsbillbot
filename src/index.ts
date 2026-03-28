@@ -117,7 +117,9 @@ async function handleQueueBatch(
 // ─── Export Worker ────────────────────────────────────────────────
 
 export default {
+  // Handling HTTP Request Entry (Webhook)
   fetch: app.fetch,
+  // Entry point for processing Queue messages (consumer)
 
   async queue(
     batch: MessageBatch<Update>,
