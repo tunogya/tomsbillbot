@@ -71,17 +71,16 @@ export function registerInvoiceHandler(bot: {
     const unpaidAmount = totalInvoiced - totalPaid;
 
     const lines = [
-      `🧾 *Invoice #${invoice.id}*`,
-      "",
-      `📊 *This Invoice:*`,
+      `*Invoice #${invoice.id}*`,
       `• Sessions: ${sessions.length}`,
       `• Total Hours: \`${formatHours(totalHours)}\``,
       `• Rate: \`${rate}/hr\``,
       `• Amount: \`$${totalAmount.toFixed(2)}\``,
       "",
-      `💰 *Balance:*`,
+      `*Balance:*`,
       `• Total Invoiced: \`$${totalInvoiced.toFixed(2)}\``,
       `• Total Paid: \`$${totalPaid.toFixed(2)}\``,
+      "",
       `• Unpaid: \`$${unpaidAmount.toFixed(2)}\``,
     ];
 
