@@ -21,7 +21,7 @@ export function registerPaymentHandler(bot: {
     if (!userId || !chatId) return;
 
     if (ctx.chat.type === "private") {
-      await ctx.reply("❌ The `/paid` command can only be used in group chats.", {
+      await ctx.reply("The `/paid` command can only be used in group chats.", {
         parse_mode: "Markdown",
       });
       return;
@@ -33,7 +33,7 @@ export function registerPaymentHandler(bot: {
     const amountStr = parts[1];
 
     if (!amountStr) {
-      await ctx.reply("❌ Usage: `/paid <amount>`\nExample: `/paid 100`", {
+      await ctx.reply("Usage: `/paid <amount>`\nExample: `/paid 100`", {
         parse_mode: "Markdown",
       });
       return;
@@ -41,7 +41,7 @@ export function registerPaymentHandler(bot: {
 
     const amount = parseFloat(amountStr);
     if (isNaN(amount) || amount <= 0) {
-      await ctx.reply("❌ Please provide a valid positive amount.");
+      await ctx.reply("Please provide a valid positive amount.");
       return;
     }
 
@@ -54,19 +54,19 @@ export function registerPaymentHandler(bot: {
     const unpaidAmount = totalInvoiced - totalPaid;
 
     const lines = [
-      `✅ *Payment Recorded*`,
+      `*Payment Recorded*`,
       "",
       `• Payment ID: #${payment.id}`,
       `• Amount: \`$${amount.toFixed(2)}\``,
       "",
-      `💰 *Updated Balance:*`,
+      `*Updated Balance:*`,
       `• Total Invoiced: \`$${totalInvoiced.toFixed(2)}\``,
       `• Total Paid: \`$${totalPaid.toFixed(2)}\``,
       `• Remaining: \`$${Math.max(0, unpaidAmount).toFixed(2)}\``,
     ];
 
     if (unpaidAmount <= 0) {
-      lines.push("", "🎉 All invoices are fully paid!");
+      lines.push("", "All invoices are fully paid!");
     }
 
     await ctx.reply(lines.join("\n"), { parse_mode: "Markdown" });
