@@ -6,9 +6,6 @@
 	"observability": {
 		"enabled": true
 	},
-	"vars": {
-		"BOT_SECRET": "CHANGE_ME_TO_RANDOM_SECRET"
-	},
 	"routes": [
 		{
 			"pattern": "billbot.abandon.ai",
