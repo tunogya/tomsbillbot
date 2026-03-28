@@ -17,7 +17,15 @@ export function registerPaymentHandler(bot: {
 
   bot.command("paid", async (ctx) => {
     const userId = ctx.from?.id;
-    if (!userId) return;
+    const chatId = ctx.chat?.id;
+    if (!userId || !chatId) return;
+
+    if (ctx.chat.type === "private") {
+      await ctx.reply("❌ The `/paid` command can only be used in group chats.", {
+        parse_mode: "Markdown",
+      });
+      return;
+    }
 
     const { db } = getCtx();
     const text = ctx.message?.text ?? "";
@@ -37,12 +45,12 @@ export function registerPaymentHandler(bot: {
       return;
     }
 
-    // Record payment
-    const payment = await recordPayment(db, userId, amount);
+    // Record payment in this chat
+    const payment = await recordPayment(db, userId, chatId, amount);
 
-    // Calculate updated balance
-    const totalPaid = await getTotalPayments(db, userId);
-    const totalInvoiced = await getTotalInvoiced(db, userId);
+    // Calculate updated balance in this chat
+    const totalPaid = await getTotalPayments(db, userId, chatId);
+    const totalInvoiced = await getTotalInvoiced(db, userId, chatId);
     const unpaidAmount = totalInvoiced - totalPaid;
 
     const lines = [

@@ -28,6 +28,13 @@ export function registerWorkHandlers(bot: {
     const chatId = ctx.chat?.id;
     if (!userId || !chatId) return;
 
+    if (ctx.chat.type === "private") {
+      await ctx.reply("❌ The `/work` command can only be used in group chats.", {
+        parse_mode: "Markdown",
+      });
+      return;
+    }
+
     const { db } = getCtx();
 
     // Ensure user exists
@@ -75,6 +82,13 @@ export function registerWorkHandlers(bot: {
     const userId = ctx.from?.id;
     const chatId = ctx.chat?.id;
     if (!userId || !chatId) return;
+
+    if (ctx.chat.type === "private") {
+      await ctx.reply("❌ The `/done` command can only be used in group chats.", {
+        parse_mode: "Markdown",
+      });
+      return;
+    }
 
     const { db } = getCtx();
 

@@ -5,7 +5,7 @@
  */
 
 import type { Context } from "grammy";
-import { upsertUser, setHourlyRate, setPaymentAddress } from "../services/db";
+import { upsertUser, setHourlyRate, setUserChatRate, setPaymentAddress } from "../services/db";
 import type { HandlerContext } from "../env";
 
 export function registerConfigHandlers(bot: {
@@ -35,12 +35,22 @@ export function registerConfigHandlers(bot: {
       return;
     }
 
-    await upsertUser(db, userId);
-    await setHourlyRate(db, userId, rate);
+    const chatId = ctx.chat?.id;
+    if (!chatId) return;
 
-    await ctx.reply(`✅ Hourly rate set to \`$${rate}/hr\``, {
-      parse_mode: "Markdown",
-    });
+    await upsertUser(db, userId);
+
+    if (ctx.chat.type === "private") {
+      await setHourlyRate(db, userId, rate);
+      await ctx.reply(`✅ *Default* hourly rate set to \`$${rate}/hr\``, {
+        parse_mode: "Markdown",
+      });
+    } else {
+      await setUserChatRate(db, userId, chatId, rate);
+      await ctx.reply(`✅ *Group-specific* hourly rate set to \`$${rate}/hr\``, {
+        parse_mode: "Markdown",
+      });
+    }
   });
 
   // /setaddress <address>

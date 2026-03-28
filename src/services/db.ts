@@ -38,6 +38,7 @@ export interface UninvoicedSession {
 export interface Invoice {
   id: number;
   user_id: number;
+  chat_id: number;
   total_amount: number;
   paid_amount: number;
   created_at: string;
@@ -46,6 +47,7 @@ export interface Invoice {
 export interface Payment {
   id: number;
   user_id: number;
+  chat_id: number;
   amount: number;
   created_at: string;
 }
@@ -89,6 +91,42 @@ export async function setPaymentAddress(
   await db
     .prepare(`UPDATE users SET payment_address = ? WHERE id = ?`)
     .bind(address, userId)
+    .run();
+}
+
+export async function getUserChatRate(
+  db: D1Database,
+  userId: number,
+  chatId: number
+): Promise<number> {
+  // First, check for group-specific rate
+  const specific = await db
+    .prepare(
+      `SELECT hourly_rate FROM user_chat_settings WHERE user_id = ? AND chat_id = ?`
+    )
+    .bind(userId, chatId)
+    .first<{ hourly_rate: number }>();
+
+  if (specific) return specific.hourly_rate;
+
+  // Fallback to default user rate
+  const user = await getUser(db, userId);
+  return user?.hourly_rate ?? 0;
+}
+
+export async function setUserChatRate(
+  db: D1Database,
+  userId: number,
+  chatId: number,
+  rate: number
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO user_chat_settings (user_id, chat_id, hourly_rate)
+       VALUES (?, ?, ?)
+       ON CONFLICT(user_id, chat_id) DO UPDATE SET hourly_rate = EXCLUDED.hourly_rate`
+    )
+    .bind(userId, chatId, rate)
     .run();
 }
 
@@ -154,15 +192,16 @@ export async function endWorkSession(
 
 export async function getUninvoicedSessions(
   db: D1Database,
-  userId: number
+  userId: number,
+  chatId: number
 ): Promise<UninvoicedSession[]> {
   const result = await db
     .prepare(
       `SELECT id, user_id, chat_id, start_time, end_time, duration
        FROM work_sessions
-       WHERE user_id = ? AND invoiced = 0 AND end_time IS NOT NULL`
+       WHERE user_id = ? AND chat_id = ? AND invoiced = 0 AND end_time IS NOT NULL`
     )
-    .bind(userId)
+    .bind(userId, chatId)
     .all<UninvoicedSession>();
   return result.results ?? [];
 }
@@ -170,16 +209,17 @@ export async function getUninvoicedSessions(
 export async function createInvoice(
   db: D1Database,
   userId: number,
+  chatId: number,
   totalAmount: number
 ): Promise<{ id: number }> {
   const createdAt = nowUTC();
   const result = await db
     .prepare(
-      `INSERT INTO invoices (user_id, total_amount, created_at)
-       VALUES (?, ?, ?)
+      `INSERT INTO invoices (user_id, chat_id, total_amount, created_at)
+       VALUES (?, ?, ?, ?)
        RETURNING id`
     )
-    .bind(userId, totalAmount, createdAt)
+    .bind(userId, chatId, totalAmount, createdAt)
     .first<{ id: number }>();
 
   if (!result) {
@@ -204,16 +244,17 @@ export async function markSessionsInvoiced(
 export async function recordPayment(
   db: D1Database,
   userId: number,
+  chatId: number,
   amount: number
 ): Promise<{ id: number }> {
   const createdAt = nowUTC();
   const result = await db
     .prepare(
-      `INSERT INTO payments (user_id, amount, created_at)
-       VALUES (?, ?, ?)
+      `INSERT INTO payments (user_id, chat_id, amount, created_at)
+       VALUES (?, ?, ?, ?)
        RETURNING id`
     )
-    .bind(userId, amount, createdAt)
+    .bind(userId, chatId, amount, createdAt)
     .first<{ id: number }>();
 
   if (!result) {
@@ -224,17 +265,18 @@ export async function recordPayment(
 
 export async function getLatestInvoice(
   db: D1Database,
-  userId: number
+  userId: number,
+  chatId: number
 ): Promise<Invoice | null> {
   const result = await db
     .prepare(
-      `SELECT id, total_amount, paid_amount, created_at
+      `SELECT id, chat_id, total_amount, paid_amount, created_at
        FROM invoices
-       WHERE user_id = ?
+       WHERE user_id = ? AND chat_id = ?
        ORDER BY created_at DESC
        LIMIT 1`
     )
-    .bind(userId)
+    .bind(userId, chatId)
     .first<Invoice>();
   return result ?? null;
 }
@@ -252,26 +294,28 @@ export async function updateInvoicePaidAmount(
 
 export async function getTotalPayments(
   db: D1Database,
-  userId: number
+  userId: number,
+  chatId: number
 ): Promise<number> {
   const result = await db
     .prepare(
-      `SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE user_id = ?`
+      `SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE user_id = ? AND chat_id = ?`
     )
-    .bind(userId)
+    .bind(userId, chatId)
     .first<{ total: number }>();
   return result?.total ?? 0;
 }
 
 export async function getTotalInvoiced(
   db: D1Database,
-  userId: number
+  userId: number,
+  chatId: number
 ): Promise<number> {
   const result = await db
     .prepare(
-      `SELECT COALESCE(SUM(total_amount), 0) as total FROM invoices WHERE user_id = ?`
+      `SELECT COALESCE(SUM(total_amount), 0) as total FROM invoices WHERE user_id = ? AND chat_id = ?`
     )
-    .bind(userId)
+    .bind(userId, chatId)
     .first<{ total: number }>();
   return result?.total ?? 0;
 }

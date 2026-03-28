@@ -6,6 +6,7 @@
 import type { Context } from "grammy";
 import {
   getUser,
+  getUserChatRate,
   getUninvoicedSessions,
   createInvoice,
   markSessionsInvoiced,
@@ -21,46 +22,52 @@ export function registerInvoiceHandler(bot: {
 
   bot.command("invoice", async (ctx) => {
     const userId = ctx.from?.id;
-    if (!userId) return;
+    const chatId = ctx.chat?.id;
+    if (!userId || !chatId) return;
+
+    if (ctx.chat.type === "private") {
+      await ctx.reply("❌ The `/invoice` command can only be used in group chats.", {
+        parse_mode: "Markdown",
+      });
+      return;
+    }
 
     const { db } = getCtx();
 
     // Get user config
     const user = await getUser(db, userId);
-    if (!user) {
-      await ctx.reply("❌ Please use /start first to register.");
-      return;
-    }
+    // Get specific rate for this chat
+    const rate = await getUserChatRate(db, userId, chatId);
 
-    if (user.hourly_rate <= 0) {
+    if (rate <= 0) {
       await ctx.reply(
-        "❌ Your hourly rate is not set. Use `/setrate <amount>` first.",
+        "❌ Your hourly rate for this chat is not set. Use `/setrate <amount>` first.",
         { parse_mode: "Markdown" }
       );
       return;
     }
 
-    // Get uninvoiced completed sessions
-    const sessions = await getUninvoicedSessions(db, userId);
+    // Get uninvoiced completed sessions in this chat
+    const sessions = await getUninvoicedSessions(db, userId, chatId);
     if (sessions.length === 0) {
-      await ctx.reply("📋 No uninvoiced work sessions found.");
+      await ctx.reply("📋 No uninvoiced work sessions found in this chat.");
       return;
     }
 
     // Calculate totals
     const totalHours = sessions.reduce((sum, s) => sum + (s.duration ?? 0), 0);
-    const totalAmount = totalHours * user.hourly_rate;
+    const totalAmount = totalHours * rate;
 
     // Create invoice record
-    const invoice = await createInvoice(db, userId, totalAmount);
+    const invoice = await createInvoice(db, userId, chatId, totalAmount);
 
     // Mark sessions as invoiced
     const sessionIds = sessions.map((s) => s.id);
     await markSessionsInvoiced(db, sessionIds);
 
-    // Get payment history for balance
-    const totalPaid = await getTotalPayments(db, userId);
-    const totalInvoiced = await getTotalInvoiced(db, userId);
+    // Get payment history for balance in this chat
+    const totalPaid = await getTotalPayments(db, userId, chatId);
+    const totalInvoiced = await getTotalInvoiced(db, userId, chatId);
     const unpaidAmount = totalInvoiced - totalPaid;
 
     const lines = [
@@ -69,7 +76,7 @@ export function registerInvoiceHandler(bot: {
       `📊 *This Invoice:*`,
       `• Sessions: ${sessions.length}`,
       `• Total Hours: \`${formatHours(totalHours)}\``,
-      `• Rate: \`$${user.hourly_rate}/hr\``,
+      `• Rate: \`${rate}/hr\``,
       `• Amount: \`$${totalAmount.toFixed(2)}\``,
       "",
       `💰 *Balance:*`,
@@ -78,7 +85,7 @@ export function registerInvoiceHandler(bot: {
       `• Unpaid: \`$${unpaidAmount.toFixed(2)}\``,
     ];
 
-    if (user.payment_address) {
+    if (user?.payment_address) {
       lines.push("", `💳 Pay to: \`${user.payment_address}\``);
     }
 
