@@ -23,7 +23,7 @@ export function registerConfigHandlers(bot: {
     const rateStr = parts[1];
 
     if (!rateStr) {
-      await ctx.reply("❌ Usage: `/setrate <amount>`\nExample: `/setrate 50`", {
+      await ctx.reply("Usage: `/setrate <amount>`\nExample: `/setrate 50`", {
         parse_mode: "Markdown",
       });
       return;
@@ -31,7 +31,7 @@ export function registerConfigHandlers(bot: {
 
     const rate = parseFloat(rateStr);
     if (isNaN(rate) || rate < 0) {
-      await ctx.reply("❌ Please provide a valid non-negative number.");
+      await ctx.reply("Please provide a valid non-negative number.");
       return;
     }
 
@@ -42,12 +42,12 @@ export function registerConfigHandlers(bot: {
 
     if (ctx.chat.type === "private") {
       await setHourlyRate(db, userId, rate);
-      await ctx.reply(`✅ *Default* hourly rate set to \`$${rate}/hr\``, {
+      await ctx.reply(`*Default* hourly rate set to \`$${rate}/hr\``, {
         parse_mode: "Markdown",
       });
     } else {
       await setUserChatRate(db, userId, chatId, rate);
-      await ctx.reply(`✅ *Group-specific* hourly rate set to \`$${rate}/hr\``, {
+      await ctx.reply(`*Group-specific* hourly rate set to \`$${rate}/hr\``, {
         parse_mode: "Markdown",
       });
     }
@@ -65,7 +65,7 @@ export function registerConfigHandlers(bot: {
 
     if (!address) {
       await ctx.reply(
-        "❌ Usage: `/setaddress <USDT_address>`\nExample: `/setaddress TXyz...`",
+        "Usage: `/setaddress <USDT_address>`\nExample: `/setaddress TXyz...`",
         { parse_mode: "Markdown" }
       );
       return;
@@ -74,7 +74,7 @@ export function registerConfigHandlers(bot: {
     await upsertUser(db, userId);
     await setPaymentAddress(db, userId, address);
 
-    await ctx.reply(`✅ Payment address set to \`${address}\``, {
+    await ctx.reply(`Payment address set to \`${address}\``, {
       parse_mode: "Markdown",
     });
   });
@@ -85,7 +85,7 @@ export function registerConfigHandlers(bot: {
     if (!userId) return;
 
     if (!ctx.chat || ctx.chat.type !== "private") {
-      await ctx.reply("❌ The `/setremark` command can only be used in DMs.");
+      await ctx.reply("The `/setremark` command can only be used in DMs.");
       return;
     }
 
@@ -95,7 +95,7 @@ export function registerConfigHandlers(bot: {
 
     if (!remark) {
       await ctx.reply(
-        "❌ Usage: `/setremark <remark_text>`\nExample: `/setremark Network: TRC20`",
+        "Usage: `/setremark <remark_text>`\nExample: `/setremark Network: TRC20`",
         { parse_mode: "Markdown" }
       );
       return;
@@ -104,7 +104,7 @@ export function registerConfigHandlers(bot: {
     await upsertUser(db, userId);
     await setUserRemark(db, userId, remark);
 
-    await ctx.reply(`✅ Invoice remark set to:\n\`${remark}\``, {
+    await ctx.reply(`Invoice remark set to:\n\`${remark}\``, {
       parse_mode: "Markdown",
     });
   });

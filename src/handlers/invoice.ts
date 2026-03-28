@@ -26,7 +26,7 @@ export function registerInvoiceHandler(bot: {
     if (!userId || !chatId) return;
 
     if (ctx.chat.type === "private") {
-      await ctx.reply("❌ The `/invoice` command can only be used in group chats.", {
+      await ctx.reply("The `/invoice` command can only be used in group chats.", {
         parse_mode: "Markdown",
       });
       return;
@@ -41,7 +41,7 @@ export function registerInvoiceHandler(bot: {
 
     if (rate <= 0) {
       await ctx.reply(
-        "❌ Your hourly rate for this chat is not set. Use `/setrate <amount>` first.",
+        "Your hourly rate for this chat is not set. Use `/setrate <amount>` first.",
         { parse_mode: "Markdown" }
       );
       return;
@@ -50,7 +50,7 @@ export function registerInvoiceHandler(bot: {
     // Get uninvoiced completed sessions in this chat
     const sessions = await getUninvoicedSessions(db, userId, chatId);
     if (sessions.length === 0) {
-      await ctx.reply("📋 No uninvoiced work sessions found in this chat.");
+      await ctx.reply("No uninvoiced work sessions found in this chat.");
       return;
     }
 
@@ -85,11 +85,11 @@ export function registerInvoiceHandler(bot: {
     ];
 
     if (user?.payment_address) {
-      lines.push("", `💳 Pay to: \`${user.payment_address}\``);
+      lines.push("", `Pay to: \`${user.payment_address}\``);
     }
 
     if (user?.remark) {
-      lines.push(`📝 Remark: ${user.remark}`);
+      lines.push(`Remark: ${user.remark}`);
     }
 
     await ctx.reply(lines.join("\n"), { parse_mode: "Markdown" });
