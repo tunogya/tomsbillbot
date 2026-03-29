@@ -45,7 +45,8 @@ export function registerStartHandler(bot: {
       "`/work` — Start a work session",
       "`/done` — End your current session",
       "`/setrate <amount>` — Set a group-specific rate",
-      "`/invoice` — Generate an invoice",
+      "`/newinvoice` — Generate an invoice",
+      "`/invoices` — List recent invoices",
       "`/paid <amount>` — Record a payment",
       "`/reset` — Reset all historical data for the group",
     ];

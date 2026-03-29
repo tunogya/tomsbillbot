@@ -524,6 +524,25 @@ export async function getLatestOpenInvoice(
   return result ?? null;
 }
 
+/** Get recent invoices for a customer in a chat (limit 5). */
+export async function getRecentInvoices(
+  db: D1Database,
+  customerId: number,
+  chatId: number,
+  limit: number = 5
+): Promise<Invoice[]> {
+  const result = await db
+    .prepare(
+      `SELECT * FROM invoices
+       WHERE customer_id = ? AND chat_id = ?
+       ORDER BY created DESC
+       LIMIT ?`
+    )
+    .bind(customerId, chatId, limit)
+    .all<Invoice>();
+  return result.results ?? [];
+}
+
 /** Get aggregated balance: total invoiced vs total paid. */
 export async function getInvoiceSummary(
   db: D1Database,

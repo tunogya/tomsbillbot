@@ -1,6 +1,6 @@
 /**
  * Invoice handler.
- * /invoice — generate an invoice from uninvoiced work sessions.
+ * /newinvoice — generate an invoice from uninvoiced work sessions.
  *
  * Flow (Stripe-inspired):
  * 1. Get uninvoiced completed sessions
@@ -16,17 +16,18 @@ import {
   getUninvoicedSessions,
   createInvoice,
   getInvoiceSummary,
+  getRecentInvoices,
   parseMetadata,
 } from "../services/db";
 import { getCachedCustomer, getCachedUnitAmount } from "../utils/cache";
-import { formatAmount, formatDuration } from "../utils/time";
+import { formatAmount, formatDuration, formatTimestamp } from "../utils/time";
 import type { HandlerContext } from "../env";
 
 export function registerInvoiceHandler(bot: {
   command: (cmd: string, handler: (ctx: Context) => Promise<void>) => void;
 }, getCtx: () => HandlerContext): void {
 
-  bot.command("invoice", async (ctx) => {
+  bot.command("newinvoice", async (ctx) => {
     const userId = ctx.from?.id;
     const chatId = ctx.chat?.id;
     if (!userId || !chatId) return;
@@ -94,6 +95,42 @@ export function registerInvoiceHandler(bot: {
     if (metadata.remark) {
       lines.push(`Remark: ${metadata.remark}`);
     }
+
+    await ctx.reply(lines.join("\n"), { parse_mode: "Markdown" });
+  });
+
+  bot.command("invoices", async (ctx) => {
+    const userId = ctx.from?.id;
+    const chatId = ctx.chat?.id;
+    if (!userId || !chatId) return;
+
+    if (ctx.chat.type === "private") {
+      await ctx.reply("Hey there! 🤖 Tom's Bill Bot can only show group invoices here.", {
+        parse_mode: "Markdown",
+      });
+      return;
+    }
+
+    const { db } = getCtx();
+    const invoices = await getRecentInvoices(db, userId, chatId, 5);
+
+    if (invoices.length === 0) {
+      await ctx.reply("Tom's Bill Bot couldn't find any invoices for you in this chat yet. 🧾✨");
+      return;
+    }
+
+    const lines = [
+      "*Your Recent Invoices 🧾*",
+      "",
+      ...invoices.map((inv) => {
+        const date = formatTimestamp(inv.created).split(" ")[0]; // Just the YYYY-MM-DD
+        const status = inv.status.toUpperCase();
+        const statusEmoji = status === "PAID" ? "✅" : "⏳";
+        return `• #${inv.id} (${date}) — \`$${formatAmount(inv.total)}\` ${statusEmoji} \`${status}\``;
+      }),
+      "",
+      "_Showing up to 5 most recent records._",
+    ];
 
     await ctx.reply(lines.join("\n"), { parse_mode: "Markdown" });
   });

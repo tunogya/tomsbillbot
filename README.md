@@ -46,7 +46,8 @@ Send these in a direct message to me (Tom's Bill Bot!):
 - `/done` — End your active work session and record the duration.
 
 ### 🧾 Invoicing & Payments
-- `/invoice` — Calculate all uninvoiced work time and generate an invoice based on your hourly rate.
+- `/newinvoice` — Calculate all uninvoiced work time and generate an invoice based on your hourly rate.
+- `/invoices` — List the 5 most recent invoices for the current user and chat.
 - `/paid <amount>` — Record a payment against your current unpaid balance.
 - `/reset` — Reset all historical data (work sessions, invoices, and payments) for the current group.
 
