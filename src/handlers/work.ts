@@ -16,6 +16,7 @@ import {
   completeWorkSession,
 } from "../services/db";
 import { nowTs, durationMinutes, formatDuration, formatTimestamp } from "../utils/time";
+import { getCachedGranularity } from "../utils/cache";
 import type { HandlerContext } from "../env";
 
 export function registerWorkHandlers(bot: {
@@ -84,7 +85,7 @@ export function registerWorkHandlers(bot: {
       return;
     }
 
-    const { db } = getCtx();
+    const { db, kv } = getCtx();
 
     // Find active session
     const session = await getActiveSession(db, userId, chatId);
@@ -93,9 +94,10 @@ export function registerWorkHandlers(bot: {
       return;
     }
 
-    // End session
+    // End session with user-configured granularity
     const endTime = nowTs();
-    const duration = durationMinutes(session.start_time, endTime);
+    const granularity = await getCachedGranularity(kv, db, userId, chatId);
+    const duration = durationMinutes(session.start_time, endTime, granularity);
     await completeWorkSession(db, session.id, endTime, duration);
 
     await ctx.reply(

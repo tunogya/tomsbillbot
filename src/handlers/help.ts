@@ -24,6 +24,8 @@ export function registerHelpHandler(bot: {
         "  _Example: `/setaddress TXyz...`_",
         "`/setremark <text>` — Set a custom note shown on your invoices",
         "  _Example: `/setremark Network: TRC20`_",
+        "`/setgranularity <minutes>` — Set billing time granularity",
+        "  _Example: `/setgranularity 5` (rounds to 5-min blocks)_",
         "",
         "*Group Commands (use in group chats):*",
         "`/work` — Start a work session",
@@ -55,6 +57,7 @@ export function registerHelpHandler(bot: {
         "`/setrate <amount>` — Set your default hourly rate",
         "`/setaddress <address>` — Set your USDT payment address",
         "`/setremark <text>` — Set a custom invoice remark",
+        "`/setgranularity <minutes>` — Set billing time granularity",
       ];
       await ctx.reply(lines.join("\n"), { parse_mode: "Markdown" });
     }

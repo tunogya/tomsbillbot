@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS prices (
   chat_id INTEGER NOT NULL,          -- 0 = global default
   unit_amount INTEGER NOT NULL,      -- cents per hour
   currency TEXT DEFAULT 'USD',
+  metadata TEXT DEFAULT '{}',        -- JSON, e.g. {"granularity_minutes": 30}
   created INTEGER NOT NULL DEFAULT 0,
   UNIQUE(customer_id, chat_id),
   FOREIGN KEY (customer_id) REFERENCES customers(id)

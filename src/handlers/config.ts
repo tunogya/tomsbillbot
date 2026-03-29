@@ -3,6 +3,7 @@
  * /setrate <hourly_rate>    — Set rate (dollars/hr → stored as cents)
  * /setaddress <address>     — Set payment address
  * /setremark <remark>       — Set invoice remark (stored in customer metadata)
+ * /setgranularity <minutes> — Set billing time granularity
  */
 
 import type { Context } from "grammy";
@@ -14,8 +15,9 @@ import {
   getCustomer,
   updateCustomerMetadata,
   parseMetadata,
+  updatePriceMetadata,
 } from "../services/db";
-import { invalidateCustomerCache, invalidateRateCache } from "../utils/cache";
+import { invalidateCustomerCache, invalidateRateCache, invalidateGranularityCache } from "../utils/cache";
 import { formatAmount } from "../utils/time";
 import type { HandlerContext } from "../env";
 
@@ -128,6 +130,54 @@ export function registerConfigHandlers(bot: {
     await invalidateCustomerCache(kv, userId);
 
     await ctx.reply(`Noted! 📝 Invoice remark set to:\n\`${remark}\``, {
+      parse_mode: "Markdown",
+    });
+  });
+
+  // /setgranularity <minutes>
+  bot.command("setgranularity", async (ctx) => {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+
+    const { db, kv } = getCtx();
+    const text = ctx.message?.text ?? "";
+    const parts = text.split(/\s+/);
+    const valueStr = parts[1];
+
+    if (!valueStr) {
+      await ctx.reply(
+        "Hold your horses! 🐴 Usage: `/setgranularity <minutes>`\n" +
+        "Examples:\n" +
+        "• `/setgranularity 1` — per-minute billing\n" +
+        "• `/setgranularity 5` — per-5-min blocks\n" +
+        "• `/setgranularity 30` — per-half-hour (default)\n" +
+        "• `/setgranularity 60` — per-hour blocks",
+        { parse_mode: "Markdown" }
+      );
+      return;
+    }
+
+    const value = parseInt(valueStr, 10);
+    if (isNaN(value) || value < 1 || value > 480) {
+      await ctx.reply("Oops! Please provide a whole number between 1 and 480 (minutes).");
+      return;
+    }
+
+    const chatId = ctx.chat?.id;
+    if (!chatId) return;
+
+    await upsertCustomer(db, userId, ctx.from?.first_name);
+
+    const targetChatId = ctx.chat.type === "private" ? 0 : chatId;
+    await updatePriceMetadata(db, userId, targetChatId, { granularity_minutes: value });
+    await invalidateGranularityCache(kv, userId, targetChatId);
+
+    const scope = ctx.chat.type === "private" ? "Default" : "Group-specific";
+    const label = value === 1 ? "1 minute (per-minute)" :
+                  value === 60 ? "60 minutes (per-hour)" :
+                  `${value} minutes`;
+
+    await ctx.reply(`Got it! ⏱️ *${scope}* billing granularity set to \`${label}\``, {
       parse_mode: "Markdown",
     });
   });

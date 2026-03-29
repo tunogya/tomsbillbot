@@ -11,13 +11,15 @@ export function nowTs(): number {
 
 /**
  * Computes duration in minutes between two Unix timestamps.
- * Billing rule: minimum 30 minutes, rounds up to the nearest 30-minute block.
+ * Billing rule: rounds up to the nearest granularity block.
+ * @param granularityMinutes — billing granularity in minutes (default: 30).
+ *   Examples: 1 = per-minute, 5 = per-5-min, 30 = per-half-hour, 60 = per-hour.
  */
-export function durationMinutes(startTs: number, endTs: number): number {
+export function durationMinutes(startTs: number, endTs: number, granularityMinutes: number = 30): number {
   if (endTs <= startTs) return 0;
   const exactMinutes = Math.floor((endTs - startTs) / 60);
-  const periods = Math.ceil(exactMinutes / 30);
-  return Math.max(30, periods * 30);
+  const periods = Math.ceil(exactMinutes / granularityMinutes);
+  return Math.max(granularityMinutes, periods * granularityMinutes);
 }
 
 /**

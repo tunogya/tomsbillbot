@@ -1,5 +1,5 @@
 import type { Context } from "grammy";
-import { upsertCustomer, getDefaultUnitAmount, parseMetadata } from "../services/db";
+import { upsertCustomer, getDefaultUnitAmount, getGranularity, parseMetadata } from "../services/db";
 import { getCachedCustomer } from "../utils/cache";
 import { formatAmount } from "../utils/time";
 import type { HandlerContext } from "../env";
@@ -18,6 +18,11 @@ export function registerStartHandler(bot: {
     const customer = await getCachedCustomer(kv, db, userId);
     const defaultRate = await getDefaultUnitAmount(db, userId);
     const metadata = customer ? parseMetadata(customer.metadata) : {};
+    const granularity = await getGranularity(db, userId, 0);
+
+    const granularityLabel = granularity === 1 ? "1 min (per-minute)" :
+                             granularity === 60 ? "60 min (per-hour)" :
+                             `${granularity} min`;
 
     const lines = [
       "*Welcome to Tom's Bill Bot! 🎩*",
@@ -26,6 +31,7 @@ export function registerStartHandler(bot: {
       "",
       "*Your Settings:*",
       `• Hourly Rate: \`$${formatAmount(defaultRate)}/hr\``,
+      `• Billing Granularity: \`${granularityLabel}\``,
       `• Payment Address: \`${customer?.payment_address || "not set"}\``,
       `• Remark: \`${metadata.remark || "not set"}\``,
       "",
@@ -33,6 +39,7 @@ export function registerStartHandler(bot: {
       "`/setrate <amount>` — Set your hourly rate",
       "`/setaddress <address>` — Set your USDT address",
       "`/setremark <text>` — Set invoice remark",
+      "`/setgranularity <minutes>` — Set billing time granularity",
       "",
       "*Group Commands:*",
       "`/work` — Start a work session",

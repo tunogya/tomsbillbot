@@ -1,12 +1,13 @@
 /**
  * KV-based cache for hot data.
  *
- * Caches frequently-read D1 data (customer info, unit rates) in KV
+ * Caches frequently-read D1 data (customer info, unit rates, granularity) in KV
  * with a short TTL. Helpers for explicit invalidation on writes.
  *
  * Cache keys:
- *   customer:{id}          → Customer JSON
- *   rate:{customerId}:{chatId} → unit_amount string
+ *   customer:{id}                    → Customer JSON
+ *   rate:{customerId}:{chatId}       → unit_amount string
+ *   granularity:{customerId}:{chatId} → granularity_minutes string
  */
 
 import type { Customer } from "../services/db";
@@ -86,5 +87,37 @@ export async function invalidateRateCache(
   // Also invalidate global default cache since it may have changed
   if (chatId !== 0) {
     await kv.delete(`rate:${customerId}:0`);
+  }
+}
+
+// ─── Granularity Cache ───────────────────────────────────────────
+
+export async function getCachedGranularity(
+  kv: KVNamespace,
+  db: D1Database,
+  customerId: number,
+  chatId: number
+): Promise<number> {
+  const key = `granularity:${customerId}:${chatId}`;
+
+  // Try cache first
+  const cached = await kv.get(key);
+  if (cached !== null) return parseInt(cached, 10);
+
+  // Fall back to D1 (uses the COALESCE fallback query in getGranularity)
+  const { getGranularity } = await import("../services/db");
+  const value = await getGranularity(db, customerId, chatId);
+  await kv.put(key, String(value), { expirationTtl: CACHE_TTL });
+  return value;
+}
+
+export async function invalidateGranularityCache(
+  kv: KVNamespace,
+  customerId: number,
+  chatId: number
+): Promise<void> {
+  await kv.delete(`granularity:${customerId}:${chatId}`);
+  if (chatId !== 0) {
+    await kv.delete(`granularity:${customerId}:0`);
   }
 }

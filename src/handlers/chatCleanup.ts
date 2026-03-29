@@ -17,6 +17,7 @@ import {
   completeWorkSession,
   getUninvoicedSessions,
   getUnitAmount,
+  getGranularity,
   createInvoice,
   getOpenInvoicesByChat,
   getInvoiceSummary,
@@ -80,7 +81,8 @@ export function registerChatCleanupHandler(
       const affectedCustomerIds = new Set<number>();
 
       for (const session of activeSessions) {
-        const duration = durationMinutes(session.start_time, endTime);
+        const granularity = await getGranularity(db, session.customer_id, chatId);
+        const duration = durationMinutes(session.start_time, endTime, granularity);
         await completeWorkSession(db, session.id, endTime, duration);
         affectedCustomerIds.add(session.customer_id);
         console.log(

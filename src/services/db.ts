@@ -32,6 +32,7 @@ export interface Price {
   chat_id: number;
   unit_amount: number; // cents per hour
   currency: string;
+  metadata: string; // JSON string, e.g. {"granularity_minutes": 30}
   created: number;
 }
 
@@ -204,8 +205,8 @@ export async function setUnitAmount(
   const ts = nowTs();
   await db
     .prepare(
-      `INSERT INTO prices (customer_id, chat_id, unit_amount, currency, created)
-       VALUES (?, ?, ?, 'USD', ?)
+      `INSERT INTO prices (customer_id, chat_id, unit_amount, currency, metadata, created)
+       VALUES (?, ?, ?, 'USD', '{}', ?)
        ON CONFLICT(customer_id, chat_id) DO UPDATE SET unit_amount = EXCLUDED.unit_amount`
     )
     .bind(customerId, chatId, unitAmount, ts)
@@ -219,6 +220,77 @@ export async function setDefaultUnitAmount(
   unitAmount: number
 ): Promise<void> {
   await setUnitAmount(db, customerId, 0, unitAmount);
+}
+
+// ─── Price Metadata Operations ────────────────────────────────────
+
+const DEFAULT_GRANULARITY_MINUTES = 30;
+
+/**
+ * Get granularity_minutes for a customer in a chat.
+ * Falls back to the global default price (chat_id = 0), then to 30.
+ */
+export async function getGranularity(
+  db: D1Database,
+  customerId: number,
+  chatId: number
+): Promise<number> {
+  const result = await db
+    .prepare(
+      `SELECT COALESCE(
+        (SELECT metadata FROM prices WHERE customer_id = ?1 AND chat_id = ?2),
+        (SELECT metadata FROM prices WHERE customer_id = ?1 AND chat_id = 0),
+        '{}'
+      ) AS metadata`
+    )
+    .bind(customerId, chatId)
+    .first<{ metadata: string }>();
+
+  const meta = parsePriceMetadata(result?.metadata ?? '{}');
+  const g = meta.granularity_minutes;
+  return typeof g === 'number' && g > 0 ? g : DEFAULT_GRANULARITY_MINUTES;
+}
+
+/** Update price metadata (read-modify-write). Creates a price row if none exists. */
+export async function updatePriceMetadata(
+  db: D1Database,
+  customerId: number,
+  chatId: number,
+  patch: Record<string, unknown>
+): Promise<void> {
+  const ts = nowTs();
+  // Ensure a price row exists (unit_amount defaults to 0 if not set)
+  await db
+    .prepare(
+      `INSERT INTO prices (customer_id, chat_id, unit_amount, currency, metadata, created)
+       VALUES (?, ?, 0, 'USD', '{}', ?)
+       ON CONFLICT(customer_id, chat_id) DO NOTHING`
+    )
+    .bind(customerId, chatId, ts)
+    .run();
+
+  // Read current metadata
+  const row = await db
+    .prepare(`SELECT metadata FROM prices WHERE customer_id = ? AND chat_id = ?`)
+    .bind(customerId, chatId)
+    .first<{ metadata: string }>();
+
+  const current = parsePriceMetadata(row?.metadata ?? '{}');
+  const updated = { ...current, ...patch };
+
+  await db
+    .prepare(`UPDATE prices SET metadata = ? WHERE customer_id = ? AND chat_id = ?`)
+    .bind(JSON.stringify(updated), customerId, chatId)
+    .run();
+}
+
+/** Helper: parse price metadata JSON. */
+export function parsePriceMetadata(raw: string): Record<string, unknown> {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
 }
 
 /** Get the global default unit amount for display in /start. */
