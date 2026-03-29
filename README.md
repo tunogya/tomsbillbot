@@ -4,6 +4,16 @@ Howdy! 🐴 I'm **Tom's Bill Bot**, your personal, high-concurrency, serverless 
 
 I'm designed to help freelancers and teams clock time across different Telegram groups, ensure exact idempotent updates, and manage crypto-invoicing seamlessly—all without breaking a sweat over scaling issues! 🤖
 
+## 💡 Philosophy
+
+> **时间应该被尊重，而不是被打包出售。**
+
+默认按 30 分钟计费，因为现实工作很少刚好 1 小时。每一段投入都值得被精确记录，而不是被四舍五入、被吞掉、被当作「不值一提」。这个工具存在的意义，就是让每一分钟的劳动都不被辜负。
+
+## 🤖 Try It Now
+
+👉 **[@TomsBillBot](https://t.me/TomsBillBot)** — 免费使用，对所有人开放。
+
 ## 🏗️ Architecture & Tech Stack
 
 The bot uses a **stateless webhook-to-queue architecture** to decouple the fast ingestion of Telegram updates from the heavier processing logic (database transactions, external dependencies).
@@ -28,6 +38,7 @@ The bot uses a **stateless webhook-to-queue architecture** to decouple the fast 
 Send these in a direct message to me (Tom's Bill Bot!):
 - `/setrate <amount>` — Set your hourly rate for invoicing (e.g., `/setrate 50`).
 - `/setaddress <address>` — Set your payment address (e.g., USDT address).
+- `/setremark <text>` — Set a custom note shown on your invoices
 
 ### ⏱️ Work Tracking (Group Commands)
 - `/work` — Start a new work session in the current group. (Only one active session allowed per user per group).
