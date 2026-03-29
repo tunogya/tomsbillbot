@@ -63,13 +63,6 @@ export function createBot(
     await next();
   });
 
-  // Typing status middleware — provide immediate feedback for commands/buttons
-  bot.use(async (ctx, next) => {
-    if (ctx.chat && (ctx.msg?.text?.startsWith("/") || ctx.callbackQuery)) {
-      ctx.replyWithChatAction("typing").catch(() => {});
-    }
-    await next();
-  });
 
   // Register all command handlers
   registerStartHandler(bot, getCtx);

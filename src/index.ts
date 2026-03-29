@@ -40,7 +40,25 @@ app.post("/webhook", async (c) => {
   }
 
   try {
-    const update = await c.req.json();
+    const update: Update = await c.req.json();
+
+    // Fire-and-forget "typing" status for immediate feedback.
+    // Only send for commands or callback queries, matching the previous bot middleware behavior.
+    const isCommand = !!update.message?.text?.startsWith("/");
+    const isCallback = !!update.callback_query;
+    const chatId = (isCommand || isCallback)
+      ? (update.message?.chat.id || update.callback_query?.message?.chat.id)
+      : undefined;
+
+    if (chatId) {
+      c.executionCtx.waitUntil(
+        fetch(`https://api.telegram.org/bot${c.env.BOT_TOKEN}/sendChatAction`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: chatId, action: "typing" }),
+        }).catch(() => {})
+      );
+    }
 
     // Push to queue for async processing
     await c.env.MY_QUEUE.send(update);
