@@ -14,6 +14,7 @@ import {
   getActiveSession,
   startWorkSession,
   completeWorkSession,
+  logManualWorkSession,
 } from "../services/db";
 import { nowTs, durationMinutes, formatDuration, formatTimestamp } from "../utils/time";
 import { getCachedGranularity } from "../utils/cache";
@@ -36,12 +37,48 @@ export function registerWorkHandlers(bot: {
       return;
     }
 
-    const { db } = getCtx();
+    const { db, kv } = getCtx();
     const userName = ctx.from?.first_name ?? "User";
 
     // Ensure customer exists (cache Telegram display name)
     await upsertCustomer(db, userId, userName);
 
+    // --- NEW: Handle /work <amount> ---
+    const amountStr = ctx.match?.toString().trim();
+    if (amountStr) {
+      const amount = parseFloat(amountStr);
+      if (isNaN(amount) || amount <= 0) {
+        await ctx.reply(
+          "Tom's Bill Bot didn't catch that. Please use a positive number for the hours, like `/work 1.5`.",
+          { parse_mode: "Markdown" }
+        );
+        return;
+      }
+
+      // Calculate final duration with user-configured granularity
+      const granularity = await getCachedGranularity(kv, db, userId, chatId);
+      const rawMins = Math.round(amount * 60);
+      
+      // We use durationMinutes helper to ensure rounding up to granularity block
+      // To use it, we need a dummy start/end range that spans rawMins
+      const now = nowTs();
+      const duration = durationMinutes(now - rawMins * 60, now, granularity);
+
+      try {
+        await logManualWorkSession(db, userId, chatId, duration);
+        await ctx.reply(
+          `*Manual work logged! Tom's Bill Bot is impressed! ✍️*\n\n` +
+          `Duration: \`${formatDuration(duration)} hours\``,
+          { parse_mode: "Markdown" }
+        );
+        return;
+      } catch (err) {
+        console.error("Manual work log failed:", err);
+        throw err;
+      }
+    }
+
+    // --- Original behavior: Start Timer ---
     // Check for existing active session
     const existing = await getActiveSession(db, userId, chatId);
     if (existing) {

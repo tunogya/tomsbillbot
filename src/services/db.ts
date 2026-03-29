@@ -363,6 +363,32 @@ export async function completeWorkSession(
     .run();
 }
 
+/**
+ * Log a manual work session that is already completed.
+ * Used for /work <amount>.
+ */
+export async function logManualWorkSession(
+  db: D1Database,
+  customerId: number,
+  chatId: number,
+  durationMinutes: number
+): Promise<{ id: number; start_time: number; end_time: number }> {
+  const ts = nowTs();
+  const startTime = ts - durationMinutes * 60;
+  
+  const result = await db
+    .prepare(
+      `INSERT INTO work_sessions (customer_id, chat_id, status, start_time, end_time, duration_minutes, created)
+       VALUES (?, ?, 'completed', ?, ?, ?, ?)
+       RETURNING id, start_time, end_time`
+    )
+    .bind(customerId, chatId, startTime, ts, durationMinutes, ts)
+    .first<{ id: number; start_time: number; end_time: number }>();
+
+  if (!result) throw new Error("Failed to log manual work session");
+  return result;
+}
+
 /** Get completed sessions not yet linked to any invoice. */
 export async function getUninvoicedSessions(
   db: D1Database,
