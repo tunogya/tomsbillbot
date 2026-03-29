@@ -6,13 +6,13 @@ I'm designed to help freelancers and teams clock time across different Telegram 
 
 ## 💡 Philosophy
 
-> **时间应该被尊重，而不是被打包出售。**
+> **Time should be respected, not sold in packages.**
 
-默认按 30 分钟计费，因为现实工作很少刚好 1 小时。每一段投入都值得被精确记录，而不是被四舍五入、被吞掉、被当作「不值一提」。这个工具存在的意义，就是让每一分钟的劳动都不被辜负。
+By default, billing is calculated in 30-minute increments, as real work rarely fits neatly into one hour. Every minute of dedication deserves to be precisely recorded, not rounded off, lost, or dismissed as "not worth mentioning." The purpose of this tool is to ensure that no minute of labor goes to waste.
 
 ## 🤖 Try It Now
 
-👉 **[@TomsBillBot](https://t.me/TomsBillBot)** — 免费使用，对所有人开放。
+👉 **[@TomsBillBot](https://t.me/TomsBillBot)** — Free to use, open to everyone.
 
 ## 🏗️ Architecture & Tech Stack
 
@@ -39,6 +39,7 @@ Send these in a direct message to me (Tom's Bill Bot!):
 - `/setrate <amount>` — Set your hourly rate for invoicing (e.g., `/setrate 50`).
 - `/setaddress <address>` — Set your payment address (e.g., USDT address).
 - `/setremark <text>` — Set a custom note shown on your invoices
+- `/setgranularity <minutes>` — Set billing time granularity (e.g., `/setgranularity 30` for 30-minute blocks, `/setgranularity 1` for per-minute billing)
 
 ### ⏱️ Work Tracking (Group Commands)
 - `/work` — Start a new work session in the current group. (Only one active session allowed per user per group).
