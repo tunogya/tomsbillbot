@@ -569,6 +569,68 @@ export async function getRecentInvoices(
   return result.results ?? [];
 }
 
+/** Get a single invoice by ID. */
+export async function getInvoice(
+  db: D1Database,
+  invoiceId: number
+): Promise<Invoice | null> {
+  const result = await db
+    .prepare(`SELECT * FROM invoices WHERE id = ?`)
+    .bind(invoiceId)
+    .first<Invoice>();
+  return result ?? null;
+}
+
+/**
+ * Void an invoice.
+ *
+ * Flow:
+ * 1. Update status to 'void', amount_due to 0, voided_at to now.
+ * 2. Add reversing balance transaction (type='adjustment').
+ */
+export async function voidInvoice(
+  db: D1Database,
+  invoiceId: number,
+  customerId: number,
+  chatId: number
+): Promise<void> {
+  const ts = nowTs();
+
+  // Get invoice details first to reverse the balance
+  const invoice = await getInvoice(db, invoiceId);
+  if (!invoice || invoice.customer_id !== customerId || invoice.chat_id !== chatId) {
+    throw new Error("Invoice not found or access denied");
+  }
+  if (invoice.status === "void") return; // Already voided
+
+  const stmts: D1PreparedStatement[] = [];
+
+  // Update invoice
+  stmts.push(
+    db
+      .prepare(
+        `UPDATE invoices
+         SET status = 'void', amount_due = 0, voided_at = ?
+         WHERE id = ?`
+      )
+      .bind(ts, invoiceId)
+  );
+
+  // Add reversing balance transaction (negative of original total)
+  // Original total was positive (receivable).
+  // We add negative total to zero it out in the ledger.
+  stmts.push(
+    db
+      .prepare(
+        `INSERT INTO balance_transactions (customer_id, chat_id, type, amount, currency, description, source_type, source_id, created)
+         VALUES (?, ?, 'adjustment', ?, 'USD', ?, 'invoice', ?, ?)`
+      )
+      .bind(customerId, chatId, -invoice.total, `Void Invoice #${invoice.id}`, invoice.id, ts)
+  );
+
+  await db.batch(stmts);
+}
+
 /** Get aggregated balance: total invoiced vs total paid. */
 export async function getInvoiceSummary(
   db: D1Database,

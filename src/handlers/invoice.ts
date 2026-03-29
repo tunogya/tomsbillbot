@@ -18,6 +18,7 @@ import {
   getInvoiceSummary,
   getRecentInvoices,
   parseMetadata,
+  voidInvoice,
 } from "../services/db";
 import { getCachedCustomer, getCachedUnitAmount } from "../utils/cache";
 import { formatAmount, formatDuration, formatTimestamp } from "../utils/time";
@@ -133,5 +134,46 @@ export function registerInvoiceHandler(bot: {
     ];
 
     await ctx.reply(lines.join("\n"), { parse_mode: "Markdown" });
+  });
+
+  bot.command("deleteinvoice", async (ctx) => {
+    const userId = ctx.from?.id;
+    const chatId = ctx.chat?.id;
+    if (!userId || !chatId) return;
+
+    if (ctx.chat.type === "private") {
+      await ctx.reply("Tom's Bill Bot can only delete group invoices here.");
+      return;
+    }
+
+    const commandText = ctx.message?.text || "";
+    const args = commandText.split(/\s+/);
+    if (args.length < 2) {
+      await ctx.reply("Usage: `/deleteinvoice <id>`", { parse_mode: "Markdown" });
+      return;
+    }
+
+    const invoiceId = parseInt(args[1], 10);
+    if (isNaN(invoiceId)) {
+      await ctx.reply("Please provide a valid numeric Invoice ID. 🧾");
+      return;
+    }
+
+    const { db } = getCtx();
+
+    try {
+      await voidInvoice(db, invoiceId, userId, chatId);
+      await ctx.reply(
+        `✅ Invoice #${invoiceId} has been cancelled (voided). It will no longer appear in your balance.`
+      );
+    } catch (error: any) {
+      if (error.message === "Invoice not found or access denied") {
+        await ctx.reply(
+          `❌ Tom's Bill Bot couldn't find Invoice #${invoiceId} for you in this chat. Make sure you are the author of the invoice.`
+        );
+      } else {
+        throw error; // Let bot.catch handle it
+      }
+    }
   });
 }
