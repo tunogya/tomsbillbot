@@ -323,6 +323,23 @@ export async function getActiveSession(
   return result ?? null;
 }
 
+/** Delete an active session (cancel work). Returns true if a session was deleted. */
+export async function deleteActiveSession(
+  db: D1Database,
+  customerId: number,
+  chatId: number
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `DELETE FROM work_sessions
+       WHERE customer_id = ? AND chat_id = ? AND status = 'active'`
+    )
+    .bind(customerId, chatId)
+    .run();
+  
+  return (result.meta.changes ?? 0) > 0;
+}
+
 /**
  * Start a new work session.
  * The UNIQUE partial index (idx_active_session) prevents duplicates at the DB level.

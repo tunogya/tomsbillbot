@@ -15,6 +15,7 @@ import {
   startWorkSession,
   completeWorkSession,
   logManualWorkSession,
+  deleteActiveSession,
 } from "../services/db";
 import { nowTs, durationMinutes, formatDuration, formatTimestamp } from "../utils/time";
 import { getCachedGranularity } from "../utils/cache";
@@ -106,6 +107,35 @@ export function registerWorkHandlers(bot: {
       } else {
         throw err;
       }
+    }
+  });
+
+  // /cancelwork — cancel an active work session
+  bot.command("cancelwork", async (ctx) => {
+    const userId = ctx.from?.id;
+    const chatId = ctx.chat?.id;
+    if (!userId || !chatId) return;
+
+    if (ctx.chat.type === "private") {
+      await ctx.reply("Hey there! 🤖 Tom's Bill Bot can only process `/cancelwork` commands in group chats.", {
+        parse_mode: "Markdown",
+      });
+      return;
+    }
+
+    const { db } = getCtx();
+
+    const deleted = await deleteActiveSession(db, userId, chatId);
+    if (deleted) {
+      await ctx.reply(
+        `*Work session cancelled! Tom's Bill Bot has wiped the slate clean. 🧹*`,
+        { parse_mode: "Markdown" }
+      );
+    } else {
+      await ctx.reply(
+        `Tom's Bill Bot couldn't find an active work session to cancel! 🔎\n(Manual work logs via \`/work <hours>\` cannot be cancelled this way.)`,
+        { parse_mode: "Markdown" }
+      );
     }
   });
 
