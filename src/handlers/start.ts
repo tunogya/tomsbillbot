@@ -21,8 +21,8 @@ export function registerStartHandler(bot: {
     const granularity = await getGranularity(db, userId, 0);
 
     const granularityLabel = granularity === 1 ? "1 min (per-minute)" :
-                             granularity === 60 ? "60 min (per-hour)" :
-                             `${granularity} min`;
+      granularity === 60 ? "60 min (per-hour)" :
+        `${granularity} min`;
 
     const lines = [
       "*Welcome to Tom's Bill Bot! 🎩*",
@@ -43,6 +43,8 @@ export function registerStartHandler(bot: {
       "",
       "*Group Commands:*",
       "`/work` — Start a work session",
+      "`/work <amount>` — Log work hours (manual)",
+      "`/cancelwork` — Cancel your current timer",
       "`/done` — End your current session",
       "`/setrate <amount>` — Set a group-specific rate",
       "`/newinvoice` — Generate an invoice",
