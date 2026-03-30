@@ -85,7 +85,9 @@ export function registerInvoiceHandler(bot: {
       `• Total Invoiced: \`$${formatAmount(summary.total_invoiced)}\``,
       `• Total Paid: \`$${formatAmount(summary.total_paid)}\``,
       "",
-      `• Unpaid: \`$${formatAmount(Math.max(0, unpaid))}\``,
+      unpaid > 0
+        ? `• Unpaid: \`$${formatAmount(unpaid)}\``
+        : `• Balance: \`$${formatAmount(-unpaid)}\``,
     ];
 
     if (customer?.payment_address) {
