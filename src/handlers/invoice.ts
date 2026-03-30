@@ -34,7 +34,7 @@ export function registerInvoiceHandler(bot: {
     if (!userId || !chatId) return;
 
     if (ctx.chat.type === "private") {
-      await ctx.reply("Hey there! 🤖 Tom's Bill Bot can only generate invoices in group chats.", {
+      await ctx.reply("Hey there! Tom's Bill Bot can only generate invoices in group chats.", {
         parse_mode: "Markdown",
       });
       return;
@@ -50,7 +50,7 @@ export function registerInvoiceHandler(bot: {
 
     if (unitAmount <= 0) {
       await ctx.reply(
-        "Tom's Bill Bot noticed your hourly rate for this chat is missing! 🧐 Use `/setrate <amount>` first.",
+        "Tom's Bill Bot noticed your hourly rate for this chat is missing! Use `/setrate <amount>` first.",
         { parse_mode: "Markdown" }
       );
       return;
@@ -59,7 +59,7 @@ export function registerInvoiceHandler(bot: {
     // Get uninvoiced completed sessions in this chat
     const sessions = await getUninvoicedSessions(db, userId, chatId);
     if (sessions.length === 0) {
-      await ctx.reply("Tom's Bill Bot couldn't find any uninvoiced work sessions here. All caught up! ✨");
+      await ctx.reply("Tom's Bill Bot couldn't find any uninvoiced work sessions here. All caught up!");
       return;
     }
 
@@ -106,7 +106,7 @@ export function registerInvoiceHandler(bot: {
     if (!userId || !chatId) return;
 
     if (ctx.chat.type === "private") {
-      await ctx.reply("Hey there! 🤖 Tom's Bill Bot can only show group invoices here.", {
+      await ctx.reply("Hey there! Tom's Bill Bot can only show group invoices here.", {
         parse_mode: "Markdown",
       });
       return;

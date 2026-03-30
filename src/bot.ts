@@ -57,7 +57,7 @@ export function createBot(
       const { kv } = getCtx();
       const allowed = await checkRateLimit(kv, userId);
       if (!allowed) {
-        await ctx.reply("🐴 Whoa there! You're sending commands too fast. Please slow down.");
+        await ctx.reply("Whoa there! You're sending commands too fast. Please slow down.");
         return;
       }
     }

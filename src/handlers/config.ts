@@ -36,7 +36,7 @@ export function registerConfigHandlers(bot: {
     const rateStr = parts[1];
 
     if (!rateStr) {
-      await ctx.reply("Hold your horses! 🐴 Usage: `/setrate <amount>`\nExample: `/setrate 50`", {
+      await ctx.reply("Hold your horses! Usage: `/setrate <amount>`\nExample: `/setrate 50`", {
         parse_mode: "Markdown",
       });
       return;
