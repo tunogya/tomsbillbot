@@ -81,13 +81,11 @@ export function registerInvoiceHandler(bot: {
       `• Rate: \`$${formatAmount(unitAmount)}/hr\``,
       `• Amount: \`$${formatAmount(invoice.total)}\``,
       "",
-      `*Balance:*`,
+      `*Summary:*`,
       `• Total Invoiced: \`$${formatAmount(summary.total_invoiced)}\``,
       `• Total Paid: \`$${formatAmount(summary.total_paid)}\``,
       "",
-      unpaid > 0
-        ? `• Unpaid: \`$${formatAmount(unpaid)}\``
-        : `• Balance: \`$${formatAmount(-unpaid)}\``,
+      `• Unpaid: \`$${formatAmount(Math.max(0, unpaid))}\``
     ];
 
     if (customer?.payment_address) {
