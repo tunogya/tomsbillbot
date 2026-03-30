@@ -74,7 +74,7 @@ export function registerInvoiceHandler(bot: {
     const totalMinutes = sessions.reduce((sum, s) => sum + (s.duration_minutes ?? 0), 0);
 
     const lines = [
-      `*Tom's Bill Bot presents Invoice #${invoice.id} 🧾*`,
+      `*Tom's Bill Bot presents Invoice #${invoice.id}*`,
       `• Status: \`${invoice.status.toUpperCase()}\``,
       `• Sessions: ${sessions.length}`,
       `• Total Hours: \`${formatDuration(totalMinutes)}\``,
@@ -116,12 +116,12 @@ export function registerInvoiceHandler(bot: {
     const invoices = await getRecentInvoices(db, userId, chatId, 5);
 
     if (invoices.length === 0) {
-      await ctx.reply("Tom's Bill Bot couldn't find any invoices for you in this chat yet. 🧾✨");
+      await ctx.reply("Tom's Bill Bot couldn't find any invoices for you in this chat yet.");
       return;
     }
 
     const lines = [
-      "*Your Recent Invoices 🧾*",
+      "*Your Recent Invoices*",
       "",
       ...invoices.map((inv) => {
         const date = formatTimestamp(inv.created).split(" ")[0]; // Just the YYYY-MM-DD
@@ -155,7 +155,7 @@ export function registerInvoiceHandler(bot: {
 
     const invoiceId = parseInt(args[1], 10);
     if (isNaN(invoiceId)) {
-      await ctx.reply("Please provide a valid numeric Invoice ID. 🧾");
+      await ctx.reply("Please provide a valid numeric Invoice ID.");
       return;
     }
 
@@ -164,12 +164,12 @@ export function registerInvoiceHandler(bot: {
     try {
       await voidInvoice(db, invoiceId, userId, chatId);
       await ctx.reply(
-        `✅ Invoice #${invoiceId} has been cancelled (voided). It will no longer appear in your balance.`
+        `Invoice #${invoiceId} has been cancelled (voided). It will no longer appear in your balance.`
       );
     } catch (error: any) {
       if (error.message === "Invoice not found or access denied") {
         await ctx.reply(
-          `❌ Tom's Bill Bot couldn't find Invoice #${invoiceId} for you in this chat. Make sure you are the author of the invoice.`
+          `Tom's Bill Bot couldn't find Invoice #${invoiceId} for you in this chat. Make sure you are the author of the invoice.`
         );
       } else {
         throw error; // Let bot.catch handle it

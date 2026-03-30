@@ -670,6 +670,22 @@ export async function getInvoiceSummary(
   };
 }
 
+/** Get the current aggregated balance from balance_transactions. */
+export async function getBalance(
+  db: D1Database,
+  customerId: number,
+  chatId: number
+): Promise<number> {
+  const result = await db
+    .prepare(
+      `SELECT SUM(amount) AS balance FROM balance_transactions 
+       WHERE customer_id = ? AND chat_id = ?`
+    )
+    .bind(customerId, chatId)
+    .first<{ balance: number }>();
+  return result?.balance ?? 0;
+}
+
 // ─── Payment Operations ──────────────────────────────────────────
 
 /**

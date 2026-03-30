@@ -23,11 +23,11 @@ export function registerResetHandler(
     try {
       const member = await ctx.api.getChatMember(ctx.chat.id, userId);
       if (member.status !== "creator" && member.status !== "administrator") {
-        await ctx.reply("🔒 Only group admins can reset billing data.");
+        await ctx.reply("Only group admins can reset billing data.");
         return;
       }
     } catch {
-      await ctx.reply("⚠️ Unable to verify admin status. Please make sure the bot has permission to see group members.");
+      await ctx.reply("Unable to verify admin status. Please make sure the bot has permission to see group members.");
       return;
     }
 
@@ -37,7 +37,7 @@ export function registerResetHandler(
     try {
       await resetGroupData(db, chatId);
       await ctx.reply(
-        "Poof! 💨 Tom's Bill Bot has permanently reset all historical bills, work sessions, and payments for this group.",
+        "Poof! Tom's Bill Bot has permanently reset all historical bills, work sessions, and payments for this group.",
         { parse_mode: "Markdown" }
       );
     } catch (err) {

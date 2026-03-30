@@ -25,7 +25,7 @@ export function registerPaymentHandler(bot: {
     if (!userId || !chatId) return;
 
     if (ctx.chat.type === "private") {
-      await ctx.reply("Hey there! 🤖 Tom's Bill Bot needs to be in a group chat to process the `/paid` command.", {
+      await ctx.reply("Hey there! Tom's Bill Bot needs to be in a group chat to process the `/paid` command.", {
         parse_mode: "Markdown",
       });
       return;
@@ -37,7 +37,7 @@ export function registerPaymentHandler(bot: {
     const amountStr = parts[1];
 
     if (!amountStr) {
-      await ctx.reply("Hold your horses! 🐴 Usage: `/paid <amount>`\nExample: `/paid 100`", {
+      await ctx.reply("Hold your horses! Usage: `/paid <amount>`\nExample: `/paid 100`", {
         parse_mode: "Markdown",
       });
       return;
@@ -80,7 +80,7 @@ export function registerPaymentHandler(bot: {
     );
 
     if (unpaid <= 0) {
-      lines.push("", "All invoices are fully paid! Tom's Bill Bot is happy! 🎉");
+      lines.push("", "All invoices are fully paid! Tom's Bill Bot is happy!");
     }
 
     await ctx.reply(lines.join("\n"), { parse_mode: "Markdown" });

@@ -25,7 +25,7 @@ export function registerStartHandler(bot: {
         `${granularity} min`;
 
     const lines = [
-      "*Welcome to Tom's Bill Bot! 🎩*",
+      "*Welcome to Tom's Bill Bot!*",
       "",
       "I'm Tom's personal assistant, here to help you track work hours and manage those invoices with style.",
       "",
@@ -49,6 +49,7 @@ export function registerStartHandler(bot: {
       "`/setrate <amount>` — Set a group-specific rate",
       "`/newinvoice` — Generate an invoice",
       "`/invoices` — List recent invoices",
+      "`/balance` — Check your credit/debit balance",
       "`/paid <amount>` — Record a payment",
       "`/reset` — Reset all historical data for the group",
     ];

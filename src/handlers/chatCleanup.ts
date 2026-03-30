@@ -127,7 +127,7 @@ export function registerChatCleanupHandler(
         const customer = await getCustomer(db, customerId);
 
         const lines = [
-          `📋 *Bill Backup — ${chatTitle}*`,
+          `*Bill Backup — ${chatTitle}*`,
           ``,
           `The bot was removed from the group. Here is your billing summary:`,
           ``,

@@ -59,13 +59,13 @@ export function registerConfigHandlers(bot: {
     if (ctx.chat.type === "private") {
       await setDefaultUnitAmount(db, userId, unitAmountCents);
       await invalidateRateCache(kv, userId, 0);
-      await ctx.reply(`Got it! ✍️ *Default* hourly rate set to \`$${formatAmount(unitAmountCents)}/hr\``, {
+      await ctx.reply(`Got it! *Default* hourly rate set to \`$${formatAmount(unitAmountCents)}/hr\``, {
         parse_mode: "Markdown",
       });
     } else {
       await setUnitAmount(db, userId, chatId, unitAmountCents);
       await invalidateRateCache(kv, userId, chatId);
-      await ctx.reply(`Got it! ✍️ *Group-specific* hourly rate set to \`$${formatAmount(unitAmountCents)}/hr\``, {
+      await ctx.reply(`Got it! *Group-specific* hourly rate set to \`$${formatAmount(unitAmountCents)}/hr\``, {
         parse_mode: "Markdown",
       });
     }
@@ -83,7 +83,7 @@ export function registerConfigHandlers(bot: {
 
     if (!address) {
       await ctx.reply(
-        "Hold your horses! 🐴 Usage: `/setaddress <USDT_address>`\nExample: `/setaddress TXyz...`",
+        "Hold your horses! Usage: `/setaddress <USDT_address>`\nExample: `/setaddress TXyz...`",
         { parse_mode: "Markdown" }
       );
       return;
@@ -93,7 +93,7 @@ export function registerConfigHandlers(bot: {
     await updateCustomerPaymentAddress(db, userId, address);
     await invalidateCustomerCache(kv, userId);
 
-    await ctx.reply(`All set! 🏦 Payment address updated to \`${address}\``, {
+    await ctx.reply(`All set! Payment address updated to \`${address}\``, {
       parse_mode: "Markdown",
     });
   });
@@ -104,7 +104,7 @@ export function registerConfigHandlers(bot: {
     if (!userId) return;
 
     if (!ctx.chat || ctx.chat.type !== "private") {
-      await ctx.reply("Psst! 🤫 Tom's Bill Bot says the `/setremark` command can only be used in our secret DMs.");
+      await ctx.reply("Psst! Tom's Bill Bot says the `/setremark` command can only be used in our secret DMs.");
       return;
     }
 
@@ -114,7 +114,7 @@ export function registerConfigHandlers(bot: {
 
     if (!remark) {
       await ctx.reply(
-        "Hold your horses! 🐴 Usage: `/setremark <remark_text>`\nExample: `/setremark Network: TRC20`",
+        "Hold your horses! Usage: `/setremark <remark_text>`\nExample: `/setremark Network: TRC20`",
         { parse_mode: "Markdown" }
       );
       return;
@@ -129,7 +129,7 @@ export function registerConfigHandlers(bot: {
     await updateCustomerMetadata(db, userId, metadata);
     await invalidateCustomerCache(kv, userId);
 
-    await ctx.reply(`Noted! 📝 Invoice remark set to:\n\`${remark}\``, {
+    await ctx.reply(`Noted! Invoice remark set to:\n\`${remark}\``, {
       parse_mode: "Markdown",
     });
   });
@@ -146,7 +146,7 @@ export function registerConfigHandlers(bot: {
 
     if (!valueStr) {
       await ctx.reply(
-        "Hold your horses! 🐴 Usage: `/setgranularity <minutes>`\n" +
+        "Hold your horses! Usage: `/setgranularity <minutes>`\n" +
         "Examples:\n" +
         "• `/setgranularity 1` — per-minute billing\n" +
         "• `/setgranularity 5` — per-5-min blocks\n" +
@@ -174,10 +174,10 @@ export function registerConfigHandlers(bot: {
 
     const scope = ctx.chat.type === "private" ? "Default" : "Group-specific";
     const label = value === 1 ? "1 minute (per-minute)" :
-                  value === 60 ? "60 minutes (per-hour)" :
-                  `${value} minutes`;
+      value === 60 ? "60 minutes (per-hour)" :
+        `${value} minutes`;
 
-    await ctx.reply(`Got it! ⏱️ *${scope}* billing granularity set to \`${label}\``, {
+    await ctx.reply(`Got it! *${scope}* billing granularity set to \`${label}\``, {
       parse_mode: "Markdown",
     });
   });

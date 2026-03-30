@@ -13,7 +13,7 @@ export function registerHelpHandler(bot: {
 
     if (isPrivate) {
       const lines = [
-        "*Tom's Bill Bot — Help 🎩*",
+        "*Tom's Bill Bot — Help*",
         "",
         "Here's what I can do for you in our DMs:",
         "",
@@ -36,6 +36,7 @@ export function registerHelpHandler(bot: {
         "`/newinvoice` — Generate an invoice for the group",
         "`/invoices` — List recent invoices for the group",
         "`/deleteinvoice <id>` — Cancel a specific invoice",
+        "`/balance` — Check your credit/debit balance",
         "`/paid <amount>` — Record a payment",
         "`/reset` — Reset all historical data for the group",
         "",
@@ -44,7 +45,7 @@ export function registerHelpHandler(bot: {
       await ctx.reply(lines.join("\n"), { parse_mode: "Markdown" });
     } else {
       const lines = [
-        "*Tom's Bill Bot — Help 🎩*",
+        "*Tom's Bill Bot — Help*",
         "",
         "Here's what I can do in this group:",
         "",
@@ -58,6 +59,7 @@ export function registerHelpHandler(bot: {
         "`/newinvoice` — Generate an invoice for the group",
         "`/invoices` — List recent invoices for the group",
         "`/deleteinvoice <id>` — Cancel a specific invoice",
+        "`/balance` — Check your credit/debit balance",
         "`/paid <amount>` — Record a payment received",
         "`/reset` — Reset all historical data for this group",
         "",

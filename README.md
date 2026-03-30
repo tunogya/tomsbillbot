@@ -48,6 +48,7 @@ Send these in a direct message to me (Tom's Bill Bot!):
 ### 🧾 Invoicing & Payments
 - `/newinvoice` — Calculate all uninvoiced work time and generate an invoice based on your hourly rate.
 - `/invoices` — List the 5 most recent invoices for the current user and chat.
+- `/balance` — Check your credit/debit balance from past invoices and payments.
 - `/paid <amount>` — Record a payment against your current unpaid balance.
 - `/reset` — Reset all historical data (work sessions, invoices, and payments) for the current group.
 

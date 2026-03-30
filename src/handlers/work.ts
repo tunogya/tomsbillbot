@@ -32,7 +32,7 @@ export function registerWorkHandlers(bot: {
     if (!userId || !chatId) return;
 
     if (ctx.chat.type === "private") {
-      await ctx.reply("Hey there! 🤖 Tom's Bill Bot can only process `/work` commands in group chats.", {
+      await ctx.reply("Hey there! Tom's Bill Bot can only process `/work` commands in group chats.", {
         parse_mode: "Markdown",
       });
       return;
@@ -59,7 +59,7 @@ export function registerWorkHandlers(bot: {
       // Calculate final duration with user-configured granularity
       const granularity = await getCachedGranularity(kv, db, userId, chatId);
       const rawMins = Math.round(amount * 60);
-      
+
       // We use durationMinutes helper to ensure rounding up to granularity block
       // To use it, we need a dummy start/end range that spans rawMins
       const now = nowTs();
@@ -68,7 +68,7 @@ export function registerWorkHandlers(bot: {
       try {
         await logManualWorkSession(db, userId, chatId, duration);
         await ctx.reply(
-          `*Manual work logged! Tom's Bill Bot is impressed! ✍️*\n\n` +
+          `*Manual work logged! Tom's Bill Bot is impressed!*\n\n` +
           `Duration: \`${formatDuration(duration)} hours\``,
           { parse_mode: "Markdown" }
         );
@@ -94,7 +94,7 @@ export function registerWorkHandlers(bot: {
       const session = await startWorkSession(db, userId, chatId);
 
       await ctx.reply(
-        `*Work session started! Tom's Bill Bot is on the clock! ⏱️*\n\n` +
+        `*Work session started! Tom's Bill Bot is on the clock!*\n\n` +
         `Don't forget to use /done when you're finished.`,
         { parse_mode: "Markdown" }
       );
@@ -117,7 +117,7 @@ export function registerWorkHandlers(bot: {
     if (!userId || !chatId) return;
 
     if (ctx.chat.type === "private") {
-      await ctx.reply("Hey there! 🤖 Tom's Bill Bot can only process `/cancelwork` commands in group chats.", {
+      await ctx.reply("Hey there! Tom's Bill Bot can only process `/cancelwork` commands in group chats.", {
         parse_mode: "Markdown",
       });
       return;
@@ -133,7 +133,7 @@ export function registerWorkHandlers(bot: {
       );
     } else {
       await ctx.reply(
-        `Tom's Bill Bot couldn't find an active work session to cancel! 🔎\n(Manual work logs via \`/work <hours>\` cannot be cancelled this way.)`,
+        `Tom's Bill Bot couldn't find an active work session to cancel!\n(Manual work logs via \`/work <hours>\` cannot be cancelled this way.)`,
         { parse_mode: "Markdown" }
       );
     }
@@ -146,7 +146,7 @@ export function registerWorkHandlers(bot: {
     if (!userId || !chatId) return;
 
     if (ctx.chat.type === "private") {
-      await ctx.reply("Hey there! 🤖 Tom's Bill Bot can only process `/done` commands in group chats.", {
+      await ctx.reply("Hey there! Tom's Bill Bot can only process `/done` commands in group chats.", {
         parse_mode: "Markdown",
       });
       return;
@@ -168,7 +168,7 @@ export function registerWorkHandlers(bot: {
     await completeWorkSession(db, session.id, endTime, duration);
 
     await ctx.reply(
-      `*Work session ended! Tom's Bill Bot says great job! 🏁*\n\n` +
+      `*Work session ended! Tom's Bill Bot says great job!*\n\n` +
       `Duration: \`${formatDuration(duration)} hours\``,
       { parse_mode: "Markdown" }
     );

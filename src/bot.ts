@@ -14,6 +14,7 @@ import { registerWorkHandlers } from "./handlers/work";
 import { registerInvoiceHandler } from "./handlers/invoice";
 import { registerPaymentHandler } from "./handlers/payment";
 import { registerResetHandler } from "./handlers/reset";
+import { registerBalanceHandler } from "./handlers/balance";
 import { registerChatCleanupHandler } from "./handlers/chatCleanup";
 import { registerHelpHandler } from "./handlers/help";
 import { checkRateLimit } from "./utils/ratelimit";
@@ -71,6 +72,7 @@ export function createBot(
   registerInvoiceHandler(bot, getCtx);
   registerPaymentHandler(bot, getCtx);
   registerResetHandler(bot, getCtx);
+  registerBalanceHandler(bot, getCtx);
   registerChatCleanupHandler(bot, getCtx);
   registerHelpHandler(bot);
 
