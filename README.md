@@ -46,19 +46,19 @@ The bot uses a **stateless webhook-to-queue architecture** to decouple the fast 
 - `/work` - Start a new work session timer.
 - `/work <hours>` - **Manual Log**. Record a specific duration (e.g., `/work 1.5`).
 - `/done` - End your active work session and record the duration.
-- `/discard` - Cancel your currently active timer without saving it.
-- `/undo` - Revert your last recorded session or active timer.
+- `/discard` - Cancel your currently active timer (requires confirmation).
+- `/undo` - Revert your last recorded session or active timer (requires confirmation).
 
 ### 🧾 Invoicing & Payments
 - `/invoice` - Generate an invoice from all uninvoiced sessions.
 - `/sessions` - List all uninvoiced work sessions before billing.
 - `/invoices` - List the 5 most recent invoices with inline **Void** and **Pay** buttons.
-- `/void <id>` - Cancel a specific invoice (author only).
+- `/void <id>` - Cancel a specific invoice (author only, requires confirmation).
 - `/balance` - Check your credit/debit balance from past invoices and payments.
-- `/paid <amount>` - Record a payment against your current unpaid balance.
-- `/settle` - Automatically record a payment for your entire outstanding balance.
+- `/paid <amount>` - Record a payment against your current unpaid balance (requires confirmation).
+- `/settle` - Automatically record a payment for your entire outstanding balance (requires confirmation).
 - `/stats` - View your weekly and monthly work statistics and estimated earnings.
-- `/reset` - Reset all historical data (sessions, invoices, payments) for the current group.
+- `/reset` - Reset all historical data for the current group (admin only, requires confirmation).
 
 ## 🚀 Getting Started
 
