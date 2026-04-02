@@ -46,7 +46,7 @@ Bot middleware auto-quotes replies in group chats and enforces per-user rate lim
 
 ## Key Conventions
 
-- DM-only commands: `/setrate`, `/setaddress`, `/setremark`, `/setgranularity` (user config)
-- Group commands: `/work`, `/done`, `/newinvoice`, `/invoices`, `/paid`, `/balance`, `/reset`
+- DM-only commands: `/settings`, `/export` (legacy: `/setrate`, `/setaddress`, `/setremark`, `/setgranularity`)
+- Group commands: `/work`, `/done`, `/invoice`, `/invoices`, `/paid`, `/balance`, `/reset`, `/discard`, `/undo`, `/stats`, `/sessions`, `/void`, `/settle`
 - Duration billing rounds up to the nearest granularity block (default 30 min)
 - The `test` script is a dry-run deploy (`wrangler deploy --dry-run`), not a vitest run. Vitest config exists at `tests/vitest.config.mts` but is not wired to an npm script.

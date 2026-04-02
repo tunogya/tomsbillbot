@@ -1,6 +1,6 @@
 /**
  * Invoice handler.
- * /newinvoice — generate an invoice from uninvoiced work sessions.
+ * /invoice — generate an invoice from uninvoiced work sessions.
  *
  * Flow (Stripe-inspired):
  * 1. Get uninvoiced completed sessions
