@@ -159,22 +159,67 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
       return;
     }
 
+    const keyboard = new InlineKeyboard()
+      .text("❌ Confirm Void", `confirm_void:${invoiceId}:${userId}`)
+      .text("✅ Keep Invoice", `cancel_void:${userId}`);
+
+    await ctx.reply(
+      `*⚠️ VOID INVOICE #${invoiceId}?*\n\n` +
+      `This will cancel the invoice and it will no longer count towards your balance.`,
+      { parse_mode: "Markdown", reply_markup: keyboard }
+    );
+  });
+
+  bot.callbackQuery(/^confirm_void:(\d+):(\d+)$/, async (ctx) => {
+    const invoiceId = parseInt(ctx.match[1], 10);
+    const targetUserId = parseInt(ctx.match[2], 10);
+    const userId = ctx.from?.id;
+    const chatId = ctx.chat?.id;
+
+    if (!userId || !chatId) return;
+
+    if (userId !== targetUserId) {
+      await ctx.answerCallbackQuery({
+        text: "This confirmation is for someone else! ⛔",
+        show_alert: true
+      });
+      return;
+    }
+
     const { db } = ctx;
 
     try {
       await voidInvoice(db, invoiceId, userId, chatId);
-      await ctx.reply(
-        `Invoice #${invoiceId} has been cancelled (voided). It will no longer appear in your balance.`
+      await ctx.editMessageText(
+        `✅ Invoice #${invoiceId} has been cancelled (voided). It will no longer appear in your balance.`
       );
+      await ctx.answerCallbackQuery();
     } catch (error: any) {
       if (error.message === "Invoice not found or access denied") {
-        await ctx.reply(
-          `Tom's Bill Bot couldn't find Invoice #${invoiceId} for you in this chat. Make sure you are the author of the invoice.`
+        await ctx.editMessageText(
+          `❌ Tom's Bill Bot couldn't find Invoice #${invoiceId} for you in this chat. Make sure you are the author of the invoice.`
         );
+        await ctx.answerCallbackQuery();
       } else {
-        throw error; // Let bot.catch handle it
+        await ctx.editMessageText("❌ Error voiding invoice.");
+        await ctx.answerCallbackQuery();
+        console.error(error);
       }
     }
+  });
+
+  bot.callbackQuery(/^cancel_void:(\d+)$/, async (ctx) => {
+    const userId = ctx.from?.id;
+    const targetUserId = parseInt(ctx.match[1], 10);
+    if (userId !== targetUserId) {
+      await ctx.answerCallbackQuery({
+        text: "This confirmation is for someone else! ⛔",
+        show_alert: true
+      });
+      return;
+    }
+    await ctx.editMessageText("Void operation cancelled. The invoice remains active.");
+    await ctx.answerCallbackQuery();
   });
 
   bot.command("sessions", async (ctx) => {

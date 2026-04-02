@@ -8,7 +8,7 @@
  * - Prevents duplicates via DB query check + UNIQUE partial index
  */
 
-import type { Context } from "grammy";
+import { Bot, InlineKeyboard } from "grammy";
 import {
   upsertCustomer,
   getActiveSession,
@@ -25,9 +25,7 @@ import type { BotContext } from "../env";
 
 import { ensureGroupChat } from "../utils/bot";
 
-export function registerWorkHandlers(bot: {
-  command: (cmd: string, handler: (ctx: BotContext) => Promise<void>) => void;
-}): void {
+export function registerWorkHandlers(bot: Bot<BotContext>): void {
 
   // /work - start a work session
   bot.command("work", async (ctx) => {
@@ -117,18 +115,68 @@ export function registerWorkHandlers(bot: {
 
     const { db } = ctx;
 
-    const deleted = await deleteActiveSession(db, userId, chatId);
-    if (deleted) {
-      await ctx.reply(
-        `*Work session cancelled! Tom's Bill Bot has wiped the slate clean. 🧹*`,
-        { parse_mode: "Markdown" }
-      );
-    } else {
+    const existing = await getActiveSession(db, userId, chatId);
+    if (!existing) {
       await ctx.reply(
         `Tom's Bill Bot couldn't find an active work session to cancel!\n(Manual work logs via \`/work <hours>\` cannot be cancelled this way.)`,
         { parse_mode: "Markdown" }
       );
+      return;
     }
+
+    const keyboard = new InlineKeyboard()
+      .text("🗑️ Discard Timer", `confirm_discard:${userId}`)
+      .text("❌ Cancel", `cancel_discard:${userId}`);
+
+    await ctx.reply(
+      `*⚠️ DISCARD ACTIVE TIMER?*\n\n` +
+      `This will permanently delete your currently active work session timer.`,
+      { parse_mode: "Markdown", reply_markup: keyboard }
+    );
+  });
+
+  bot.callbackQuery(/^confirm_discard:(\d+)$/, async (ctx) => {
+    const userId = ctx.from?.id;
+    const targetUserId = parseInt(ctx.match[1], 10);
+    const chatId = ctx.chat?.id;
+    if (!userId || !chatId) return;
+
+    if (userId !== targetUserId) {
+      await ctx.answerCallbackQuery({
+        text: "This confirmation is for someone else! ⛔",
+        show_alert: true
+      });
+      return;
+    }
+
+    const { db } = ctx;
+    const deleted = await deleteActiveSession(db, userId, chatId);
+    if (deleted) {
+      await ctx.editMessageText(
+        `*Work session cancelled! Tom's Bill Bot has wiped the slate clean. 🧹*`,
+        { parse_mode: "Markdown" }
+      );
+    } else {
+      await ctx.editMessageText(
+        `Tom's Bill Bot couldn't find that active session anymore. It might have already been processed.`,
+        { parse_mode: "Markdown" }
+      );
+    }
+    await ctx.answerCallbackQuery();
+  });
+
+  bot.callbackQuery(/^cancel_discard:(\d+)$/, async (ctx) => {
+    const userId = ctx.from?.id;
+    const targetUserId = parseInt(ctx.match[1], 10);
+    if (userId !== targetUserId) {
+      await ctx.answerCallbackQuery({
+        text: "This confirmation is for someone else! ⛔",
+        show_alert: true
+      });
+      return;
+    }
+    await ctx.editMessageText("Discard cancelled. Your timer is still running! ⏱️");
+    await ctx.answerCallbackQuery();
   });
 
   // /done - end a work session
@@ -170,30 +218,61 @@ export function registerWorkHandlers(bot: {
 
     if (!await ensureGroupChat(ctx, "undo")) return;
 
-    const { db } = ctx;
+    const keyboard = new InlineKeyboard()
+      .text("⏪ Confirm Undo", `confirm_undo:${userId}`)
+      .text("❌ Cancel", `cancel_undo:${userId}`);
 
+    await ctx.reply(
+      `*⚠️ UNDO LAST SESSION?*\n\n` +
+      `This will delete your most recent work session or timer if it hasn't been invoiced yet.`,
+      { parse_mode: "Markdown", reply_markup: keyboard }
+    );
+  });
+
+  bot.callbackQuery(/^confirm_undo:(\d+)$/, async (ctx) => {
+    const userId = ctx.from?.id;
+    const targetUserId = parseInt(ctx.match[1], 10);
+    const chatId = ctx.chat?.id;
+    if (!userId || !chatId) return;
+
+    if (userId !== targetUserId) {
+      await ctx.answerCallbackQuery({
+        text: "This confirmation is for someone else! ⛔",
+        show_alert: true
+      });
+      return;
+    }
+
+    const { db } = ctx;
     const reverted = await undoLastWorkSession(db, userId, chatId);
     if (reverted) {
+      let msg = "";
       if (reverted.duration_minutes !== null) {
-        await ctx.reply(
-          `*Undo successful! ⏪*
-
-Tom's Bill Bot has deleted your last completed work session (${formatDuration(reverted.duration_minutes)} hours).`,
-          { parse_mode: "Markdown" }
-        );
+        msg = `*Undo successful! ⏪*\n\nTom's Bill Bot has deleted your last completed work session (\`${formatDuration(reverted.duration_minutes)} hours\`).`;
       } else {
-        await ctx.reply(
-          `*Undo successful! ⏪*
-
-Tom's Bill Bot has deleted your currently active timer.`,
-          { parse_mode: "Markdown" }
-        );
+        msg = `*Undo successful! ⏪*\n\nTom's Bill Bot has deleted your currently active timer.`;
       }
+      await ctx.editMessageText(msg, { parse_mode: "Markdown" });
     } else {
-      await ctx.reply(
+      await ctx.editMessageText(
         "Tom's Bill Bot couldn't find any recent uninvoiced work sessions to undo.",
         { parse_mode: "Markdown" }
       );
     }
+    await ctx.answerCallbackQuery();
+  });
+
+  bot.callbackQuery(/^cancel_undo:(\d+)$/, async (ctx) => {
+    const userId = ctx.from?.id;
+    const targetUserId = parseInt(ctx.match[1], 10);
+    if (userId !== targetUserId) {
+      await ctx.answerCallbackQuery({
+        text: "This confirmation is for someone else! ⛔",
+        show_alert: true
+      });
+      return;
+    }
+    await ctx.editMessageText("Undo cancelled. No data was deleted.");
+    await ctx.answerCallbackQuery();
   });
 }
