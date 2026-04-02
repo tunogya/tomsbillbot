@@ -1,13 +1,12 @@
+import { Bot } from "grammy";
 import type { BotContext } from "../env";
 import { getStats, getInvoiceSummary } from "../services/db";
 import { getCachedUnitAmount } from "../utils/cache";
 import { nowTs, formatDuration, formatAmount, WEEK_IN_SECONDS, MONTH_IN_SECONDS, computeAmount } from "../utils/time";
 import { ensureGroupChat } from "../utils/bot";
 
-import { ensureGroupChat } from "../utils/bot";
-
-export function registerStatsHandler(bot: any): void {
-  bot.command("stats", async (ctx: BotContext) => {
+export function registerStatsHandler(bot: Bot<BotContext>): void {
+  bot.command("stats", async (ctx) => {
     const userId = ctx.from?.id;
     const chatId = ctx.chat?.id;
     if (!userId || !chatId) return;

@@ -1,12 +1,10 @@
-import type { Context } from "grammy";
+import { Bot } from "grammy";
 import { upsertCustomer, getDefaultUnitAmount, getGranularity, parseMetadata } from "../services/db";
 import { getCachedCustomer } from "../utils/cache";
 import { formatAmount } from "../utils/time";
 import type { BotContext } from "../env";
 
-export function registerStartHandler(bot: {
-  command: (cmd: string, handler: (ctx: BotContext) => Promise<void>) => void;
-}): void {
+export function registerStartHandler(bot: Bot<BotContext>): void {
   bot.command("start", async (ctx) => {
     const userId = ctx.from?.id;
     if (!userId) return;

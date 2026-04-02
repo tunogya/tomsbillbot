@@ -3,11 +3,10 @@
  * Displays available commands based on chat context (private vs group).
  */
 
-import type { Context } from "grammy";
+import { Bot } from "grammy";
+import type { BotContext } from "../env";
 
-export function registerHelpHandler(bot: {
-  command: (cmd: string, handler: (ctx: Context) => Promise<void>) => void;
-}): void {
+export function registerHelpHandler(bot: Bot<BotContext>): void {
   bot.command("help", async (ctx) => {
     const isPrivate = ctx.chat?.type === "private";
 
