@@ -10,7 +10,8 @@
  */
 
 import type { AppEnv } from "../env";
-import { nowTs, durationMinutes, formatDuration } from "../utils/time";
+import { nowTs, durationMinutes, formatDuration, formatAmount } from "../utils/time";
+import { sendTelegramMessage } from "../utils/bot";
 
 const STALE_THRESHOLD = 12 * 60 * 60; // 12 hours in seconds
 const ABANDON_THRESHOLD = 24 * 60 * 60; // 24 hours in seconds
@@ -29,27 +30,6 @@ interface UnpaidInvoice {
   chat_id: number;
   amount_due: number;
   created: number;
-}
-
-/** Send a Telegram message via Bot API (plain fetch, no grammY needed). */
-async function sendTelegramMessage(
-  botToken: string,
-  chatId: number,
-  text: string
-): Promise<void> {
-  const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: "Markdown",
-    }),
-  });
-  if (!resp.ok) {
-    console.error(`[scheduled] Failed to send message to chat ${chatId}:`, await resp.text());
-  }
 }
 
 /**
@@ -140,13 +120,11 @@ export async function handleScheduled(env: AppEnv): Promise<void> {
     const alreadyReminded = await env.KV.get(reminderKey);
     if (alreadyReminded) continue;
 
-    const amountStr = (inv.amount_due / 100).toFixed(2);
-
     await sendTelegramMessage(
       env.BOT_TOKEN,
       inv.chat_id,
       `📬 *Invoice #${inv.id} Reminder*\n\n` +
-      `User \`${inv.customer_id}\` has an unpaid invoice of \`$${amountStr}\`.\n` +
+      `User \`${inv.customer_id}\` has an unpaid invoice of \`$${formatAmount(inv.amount_due)}\`.\n` +
       `Use /paid to record a payment.`
     );
 

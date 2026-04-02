@@ -28,30 +28,7 @@ import {
 } from "../services/db";
 import { nowTs, durationMinutes, formatDuration, formatAmount } from "../utils/time";
 import type { BotContext } from "../env";
-
-/** Send a Telegram message via Bot API (plain fetch, no grammY needed). */
-async function sendTelegramMessage(
-  botToken: string,
-  chatId: number,
-  text: string
-): Promise<boolean> {
-  const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: "Markdown",
-    }),
-  });
-  if (!resp.ok) {
-    const body = await resp.text();
-    console.warn(`[chatCleanup] DM failed for chat ${chatId}: ${resp.status} ${body}`);
-    return false;
-  }
-  return true;
-}
+import { sendTelegramMessage } from "../utils/bot";
 
 export function registerChatCleanupHandler(
   bot: Bot<BotContext>
