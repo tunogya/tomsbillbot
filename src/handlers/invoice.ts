@@ -11,7 +11,7 @@
  * 6. Display invoice with balance summary
  */
 
-import type { Context } from "grammy";
+import { Bot, InlineKeyboard } from "grammy";
 import {
   getUninvoicedSessions,
   createInvoice,
@@ -19,16 +19,15 @@ import {
   getRecentInvoices,
   parseMetadata,
   voidInvoice,
+  recordPayment,
 } from "../services/db";
 import { getCachedCustomer, getCachedUnitAmount } from "../utils/cache";
 import { formatAmount, formatDuration, formatTimestamp } from "../utils/time";
 import type { BotContext } from "../env";
 
-export function registerInvoiceHandler(bot: {
-  command: (cmd: string, handler: (ctx: BotContext) => Promise<void>) => void;
-}): void {
+export function registerInvoiceHandler(bot: Bot<BotContext>): void {
 
-  bot.command("newinvoice", async (ctx) => {
+  bot.command("invoice", async (ctx) => {
     const userId = ctx.from?.id;
     const chatId = ctx.chat?.id;
     if (!userId || !chatId) return;
@@ -127,16 +126,26 @@ export function registerInvoiceHandler(bot: {
         const date = formatTimestamp(inv.created).split(" ")[0]; // Just the YYYY-MM-DD
         const status = inv.status.toUpperCase();
         const statusEmoji = status === "PAID" ? "✅" : "⏳";
-        return `• #${inv.id} (${date}) — \`$${formatAmount(inv.total)}\` ${statusEmoji} \`${status}\``;
+        return `• #${inv.id} (${date}) — \`${formatAmount(inv.total)}\` ${statusEmoji} \`${status}\``;
       }),
       "",
       "_Showing up to 5 most recent records._",
     ];
 
-    await ctx.reply(lines.join("\n"), { parse_mode: "Markdown" });
+    // Find first unpaid invoice to show buttons for
+    const unpaidInvoice = invoices.find(inv => inv.status === 'open' || inv.status === 'draft');
+    const options: any = { parse_mode: "Markdown" };
+    
+    if (unpaidInvoice) {
+      options.reply_markup = new InlineKeyboard()
+        .text("❌ Void #" + unpaidInvoice.id, "void_" + unpaidInvoice.id)
+        .text("💳 Pay #" + unpaidInvoice.id, "pay_" + unpaidInvoice.id);
+    }
+
+    await ctx.reply(lines.join("\n"), options);
   });
 
-  bot.command("deleteinvoice", async (ctx) => {
+  bot.command("void", async (ctx) => {
     const userId = ctx.from?.id;
     const chatId = ctx.chat?.id;
     if (!userId || !chatId) return;
@@ -149,7 +158,7 @@ export function registerInvoiceHandler(bot: {
     const commandText = ctx.message?.text || "";
     const args = commandText.split(/\s+/);
     if (args.length < 2) {
-      await ctx.reply("Usage: `/deleteinvoice <id>`", { parse_mode: "Markdown" });
+      await ctx.reply("Usage: `/void <id>`", { parse_mode: "Markdown" });
       return;
     }
 
@@ -176,4 +185,111 @@ export function registerInvoiceHandler(bot: {
       }
     }
   });
+
+  bot.command("sessions", async (ctx) => {
+    const userId = ctx.from?.id;
+    const chatId = ctx.chat?.id;
+    if (!userId || !chatId) return;
+
+    if (ctx.chat.type === "private") {
+      await ctx.reply("Hey there! Tom's Bill Bot can only show sessions in group chats.", {
+        parse_mode: "Markdown",
+      });
+      return;
+    }
+
+    const { db } = ctx;
+
+    // Get uninvoiced completed sessions in this chat
+    const sessions = await getUninvoicedSessions(db, userId, chatId);
+    if (sessions.length === 0) {
+      await ctx.reply("Tom's Bill Bot couldn't find any uninvoiced work sessions. You're all caught up!");
+      return;
+    }
+
+    const totalMinutes = sessions.reduce((sum, s) => sum + (s.duration_minutes ?? 0), 0);
+
+    const lines = [
+      `*Uninvoiced Work Sessions*`,
+      "",
+      ...sessions.map((s, i) => {
+        const date = formatTimestamp(s.start_time).split(" ")[0]; // Just the YYYY-MM-DD
+        return `${i + 1}. ${date} — \`${formatDuration(s.duration_minutes ?? 0)} hours\``;
+      }),
+      "",
+      `*Total Unbilled:* \`${formatDuration(totalMinutes)} hours\``,
+      "",
+      "_Ready to bill? Use /invoice_"
+    ];
+
+    await ctx.reply(lines.join("\n"), { parse_mode: "Markdown" });
+  });
+
+  bot.callbackQuery(/^void_(\d+)$/, async (ctx) => {
+    const invoiceIdStr = ctx.match[1];
+    const invoiceId = parseInt(invoiceIdStr, 10);
+    
+    const userId = ctx.from?.id;
+    const chatId = ctx.chat?.id;
+    if (!userId || !chatId) return;
+
+    const { db } = ctx;
+
+    try {
+      await voidInvoice(db, invoiceId, userId, chatId);
+      await ctx.answerCallbackQuery({ text: "Invoice voided successfully!", show_alert: true });
+      
+      // Optionally update the message to remove the button
+      if (ctx.callbackQuery.message) {
+        await ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard() });
+      }
+    } catch (error: any) {
+      if (error.message === "Invoice not found or access denied") {
+        await ctx.answerCallbackQuery({ text: "Cannot void this invoice.", show_alert: true });
+      } else {
+        await ctx.answerCallbackQuery({ text: "Error voiding invoice." });
+        console.error(error);
+      }
+    }
+  });
+
+
+  bot.callbackQuery(/^pay_(\d+)$/, async (ctx) => {
+    const invoiceIdStr = ctx.match[1];
+    const invoiceId = parseInt(invoiceIdStr, 10);
+    
+    const userId = ctx.from?.id;
+    const chatId = ctx.chat?.id;
+    if (!userId || !chatId) return;
+
+    const { db } = ctx;
+
+    try {
+      // Find the invoice to get the amount due
+      const result = await db.prepare("SELECT amount_due FROM invoices WHERE id = ? AND customer_id = ? AND chat_id = ?")
+        .bind(invoiceId, userId, chatId).first<{ amount_due: number }>();
+        
+      if (!result) {
+        await ctx.answerCallbackQuery({ text: "Invoice not found.", show_alert: true });
+        return;
+      }
+      
+      if (result.amount_due <= 0) {
+        await ctx.answerCallbackQuery({ text: "Invoice is already paid or voided.", show_alert: true });
+        return;
+      }
+
+      await recordPayment(db, userId, chatId, result.amount_due);
+      await ctx.answerCallbackQuery({ text: "Payment recorded successfully!", show_alert: true });
+      
+      if (ctx.callbackQuery.message) {
+        await ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard() });
+        // Can optionally append text to the message, but hiding the keyboard is enough.
+      }
+    } catch (error: any) {
+      await ctx.answerCallbackQuery({ text: "Error recording payment." });
+      console.error(error);
+    }
+  });
+
 }

@@ -16,6 +16,7 @@ import {
   completeWorkSession,
   logManualWorkSession,
   deleteActiveSession,
+  undoLastWorkSession,
 } from "../services/db";
 import { nowTs, durationMinutes, formatDuration, formatTimestamp } from "../utils/time";
 import { getCachedGranularity } from "../utils/cache";
@@ -110,14 +111,14 @@ export function registerWorkHandlers(bot: {
     }
   });
 
-  // /cancelwork — cancel an active work session
-  bot.command("cancelwork", async (ctx) => {
+  // /discard — cancel an active work session
+  bot.command("discard", async (ctx) => {
     const userId = ctx.from?.id;
     const chatId = ctx.chat?.id;
     if (!userId || !chatId) return;
 
     if (ctx.chat.type === "private") {
-      await ctx.reply("Hey there! Tom's Bill Bot can only process `/cancelwork` commands in group chats.", {
+      await ctx.reply("Hey there! Tom's Bill Bot can only process `/discard` commands in group chats.", {
         parse_mode: "Markdown",
       });
       return;
@@ -172,5 +173,46 @@ export function registerWorkHandlers(bot: {
       `Duration: \`${formatDuration(duration)} hours\``,
       { parse_mode: "Markdown" }
     );
+  });
+
+
+  // /undo — revert the last uninvoiced work session
+  bot.command("undo", async (ctx) => {
+    const userId = ctx.from?.id;
+    const chatId = ctx.chat?.id;
+    if (!userId || !chatId) return;
+
+    if (ctx.chat.type === "private") {
+      await ctx.reply("Hey there! Tom's Bill Bot can only process `/undo` commands in group chats.", {
+        parse_mode: "Markdown",
+      });
+      return;
+    }
+
+    const { db } = ctx;
+
+    const reverted = await undoLastWorkSession(db, userId, chatId);
+    if (reverted) {
+      if (reverted.duration_minutes !== null) {
+        await ctx.reply(
+          `*Undo successful! ⏪*
+
+Tom's Bill Bot has deleted your last completed work session (${formatDuration(reverted.duration_minutes)} hours).`,
+          { parse_mode: "Markdown" }
+        );
+      } else {
+        await ctx.reply(
+          `*Undo successful! ⏪*
+
+Tom's Bill Bot has deleted your currently active timer.`,
+          { parse_mode: "Markdown" }
+        );
+      }
+    } else {
+      await ctx.reply(
+        "Tom's Bill Bot couldn't find any recent uninvoiced work sessions to undo.",
+        { parse_mode: "Markdown" }
+      );
+    }
   });
 }

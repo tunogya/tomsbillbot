@@ -85,4 +85,51 @@ export function registerPaymentHandler(bot: {
 
     await ctx.reply(lines.join("\n"), { parse_mode: "Markdown" });
   });
+
+
+  bot.command("settle", async (ctx) => {
+    const userId = ctx.from?.id;
+    const chatId = ctx.chat?.id;
+    if (!userId || !chatId) return;
+
+    if (ctx.chat.type === "private") {
+      await ctx.reply("Hey there! Tom's Bill Bot needs to be in a group chat to process the `/settle` command.", {
+        parse_mode: "Markdown",
+      });
+      return;
+    }
+
+    const { db } = ctx;
+
+    // Get updated balance
+    const summary = await getInvoiceSummary(db, userId, chatId);
+    const unpaid = summary.total_invoiced - summary.total_paid;
+
+    if (unpaid <= 0) {
+      await ctx.reply("You have no outstanding balance to settle. All invoices are fully paid!", { parse_mode: "Markdown" });
+      return;
+    }
+
+    // Record payment (auto-links to latest open invoice)
+    const { payment, invoice } = await recordPayment(db, userId, chatId, unpaid);
+
+    const lines = [
+      `*Balance Settled! 💰*`,
+      "",
+      `• Payment ID: #${payment.id}`,
+      `• Amount: \`${formatAmount(unpaid)}\``,
+      `• Status: \`${payment.status.toUpperCase()}\``,
+    ];
+
+    if (invoice) {
+      lines.push(`• Linked to Invoice #${invoice.id} (${invoice.status.toUpperCase()})`);
+    }
+
+    lines.push(
+      "",
+      `All invoices are now fully paid! Tom's Bill Bot is happy!`
+    );
+
+    await ctx.reply(lines.join("\n"), { parse_mode: "Markdown" });
+  });
 }

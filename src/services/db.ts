@@ -307,6 +307,32 @@ export async function getDefaultUnitAmount(
 
 // ─── Work Session Operations ──────────────────────────────────────
 
+
+
+export async function undoLastWorkSession(
+  db: D1Database,
+  customerId: number,
+  chatId: number
+): Promise<{ id: number; duration_minutes: number | null; start_time: number } | null> {
+  const result = await db
+    .prepare(
+      `SELECT id, duration_minutes, start_time FROM work_sessions
+       WHERE customer_id = ? AND chat_id = ? AND invoice_id IS NULL
+       ORDER BY created DESC LIMIT 1`
+    )
+    .bind(customerId, chatId)
+    .first<{ id: number; duration_minutes: number | null; start_time: number }>();
+
+  if (!result) return null;
+
+  await db
+    .prepare(`DELETE FROM work_sessions WHERE id = ?`)
+    .bind(result.id)
+    .run();
+
+  return result;
+}
+
 export async function getActiveSession(
   db: D1Database,
   customerId: number,
@@ -784,4 +810,54 @@ export async function resetGroupData(
     db.prepare(`DELETE FROM work_sessions WHERE chat_id = ?`).bind(chatId),
     db.prepare(`DELETE FROM prices WHERE chat_id = ?`).bind(chatId),
   ]);
+}
+
+
+export async function getStats(
+  db: D1Database,
+  customerId: number,
+  chatId: number,
+  sinceTs: number
+): Promise<{
+  total_minutes: number;
+  unbilled_minutes: number;
+}> {
+  const result = await db
+    .prepare(
+      `SELECT 
+         SUM(duration_minutes) as total_minutes,
+         SUM(CASE WHEN invoice_id IS NULL THEN duration_minutes ELSE 0 END) as unbilled_minutes
+       FROM work_sessions
+       WHERE customer_id = ? AND chat_id = ? AND start_time >= ? AND status = 'completed'`
+    )
+    .bind(customerId, chatId, sinceTs)
+    .first<{ total_minutes: number; unbilled_minutes: number }>();
+
+  return {
+    total_minutes: result?.total_minutes || 0,
+    unbilled_minutes: result?.unbilled_minutes || 0
+  };
+}
+
+
+export async function getAllInvoicesForExport(
+  db: D1Database,
+  customerId: number
+): Promise<any[]> {
+  const { results } = await db
+    .prepare("SELECT * FROM invoices WHERE customer_id = ? ORDER BY created DESC")
+    .bind(customerId)
+    .all();
+  return results || [];
+}
+
+export async function getAllWorkSessionsForExport(
+  db: D1Database,
+  customerId: number
+): Promise<any[]> {
+  const { results } = await db
+    .prepare("SELECT * FROM work_sessions WHERE customer_id = ? ORDER BY created DESC")
+    .bind(customerId)
+    .all();
+  return results || [];
 }
