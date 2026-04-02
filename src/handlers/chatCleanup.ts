@@ -104,7 +104,7 @@ export function registerChatCleanupHandler(
         const unitAmount = await getUnitAmount(db, customerId, chatId);
         if (unitAmount <= 0) {
           console.warn(
-            `[chatCleanup] Skipping invoice for customer ${customerId} — no rate configured`
+            `[chatCleanup] Skipping invoice for customer ${customerId} - no rate configured`
           );
           return;
         }
@@ -134,7 +134,7 @@ export function registerChatCleanupHandler(
         const unpaid = Math.max(0, summary.total_invoiced - summary.total_paid);
 
         const lines = [
-          `*Bill Backup — ${chatTitle}*`,
+          `*Bill Backup - ${chatTitle}*`,
           ``,
           `The bot was removed from the group. Here is your billing summary:`,
           ``,
@@ -143,7 +143,7 @@ export function registerChatCleanupHandler(
 
         for (const inv of invoices) {
           lines.push(
-            `• Invoice #${inv.id} — \`$${formatAmount(inv.amount_due)}\` due`
+            `• Invoice #${inv.id} - \`$${formatAmount(inv.amount_due)}\` due`
           );
         }
 
@@ -171,7 +171,7 @@ export function registerChatCleanupHandler(
           console.log(`[chatCleanup] DM sent to customer ${customerId}`);
         } else {
           console.warn(
-            `[chatCleanup] Could not DM customer ${customerId} — ` +
+            `[chatCleanup] Could not DM customer ${customerId} - ` +
             `user may not have started private chat with the bot`
           );
         }

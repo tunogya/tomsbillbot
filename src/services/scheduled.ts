@@ -53,7 +53,7 @@ async function sendTelegramMessage(
 }
 
 /**
- * Main scheduled handler — called by Cron Trigger.
+ * Main scheduled handler - called by Cron Trigger.
  */
 export async function handleScheduled(env: AppEnv): Promise<void> {
   const now = nowTs();
@@ -135,7 +135,7 @@ export async function handleScheduled(env: AppEnv): Promise<void> {
     .all<UnpaidInvoice>();
 
   for (const inv of unpaidInvoices.results ?? []) {
-    // Use KV to avoid spamming — remind at most once per 7 days
+    // Use KV to avoid spamming - remind at most once per 7 days
     const reminderKey = `reminder:invoice:${inv.id}`;
     const alreadyReminded = await env.KV.get(reminderKey);
     if (alreadyReminded) continue;

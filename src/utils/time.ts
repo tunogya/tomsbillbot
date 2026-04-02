@@ -15,7 +15,7 @@ export function nowTs(): number {
 
 /**
  * Rounds duration in minutes up to the nearest granularity block.
- * @param granularityMinutes — billing granularity in minutes (default: 30).
+ * @param granularityMinutes - billing granularity in minutes (default: 30).
  */
 export function roundToGranularity(minutes: number, granularityMinutes: number = 30): number {
   if (minutes <= 0) return 0;
@@ -26,7 +26,7 @@ export function roundToGranularity(minutes: number, granularityMinutes: number =
 /**
  * Computes duration in minutes between two Unix timestamps.
  * Billing rule: rounds up to the nearest granularity block.
- * @param granularityMinutes — billing granularity in minutes (default: 30).
+ * @param granularityMinutes - billing granularity in minutes (default: 30).
  */
 export function durationMinutes(startTs: number, endTs: number, granularityMinutes: number = 30): number {
   if (endTs <= startTs) return 0;

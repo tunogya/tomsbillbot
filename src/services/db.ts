@@ -1,5 +1,5 @@
 /**
- * Database service layer — Stripe-inspired object model.
+ * Database service layer - Stripe-inspired object model.
  *
  * All amounts are stored in cents (integer).
  * All timestamps are Unix seconds (integer).

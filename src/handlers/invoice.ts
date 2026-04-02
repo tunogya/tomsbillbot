@@ -1,6 +1,6 @@
 /**
  * Invoice handler.
- * /invoice — generate an invoice from uninvoiced work sessions.
+ * /invoice - generate an invoice from uninvoiced work sessions.
  *
  * Flow (Stripe-inspired):
  * 1. Get uninvoiced completed sessions
@@ -120,7 +120,7 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
         const date = formatTimestamp(inv.created).split(" ")[0]; // Just the YYYY-MM-DD
         const status = inv.status.toUpperCase();
         const statusEmoji = status === "PAID" ? "✅" : "⏳";
-        return `• #${inv.id} (${date}) — \`${formatAmount(inv.total)}\` ${statusEmoji} \`${status}\``;
+        return `• #${inv.id} (${date}) - \`${formatAmount(inv.total)}\` ${statusEmoji} \`${status}\``;
       }),
       "",
       "_Showing up to 5 most recent records._",
@@ -200,7 +200,7 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
       "",
       ...sessions.map((s, i) => {
         const date = formatTimestamp(s.start_time).split(" ")[0]; // Just the YYYY-MM-DD
-        return `${i + 1}. ${date} — \`${formatDuration(s.duration_minutes ?? 0)} hours\``;
+        return `${i + 1}. ${date} - \`${formatDuration(s.duration_minutes ?? 0)} hours\``;
       }),
       "",
       `*Total Unbilled:* \`${formatDuration(totalMinutes)} hours\``,

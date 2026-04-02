@@ -1,7 +1,7 @@
 /**
  * Work session handlers (Group commands).
- * /work — start a session
- * /done — end a session
+ * /work - start a session
+ * /done - end a session
  *
  * Rules:
  * - One active session per customer per group
@@ -29,7 +29,7 @@ export function registerWorkHandlers(bot: {
   command: (cmd: string, handler: (ctx: BotContext) => Promise<void>) => void;
 }): void {
 
-  // /work — start a work session
+  // /work - start a work session
   bot.command("work", async (ctx) => {
     const userId = ctx.from?.id;
     const chatId = ctx.chat?.id;
@@ -107,7 +107,7 @@ export function registerWorkHandlers(bot: {
     }
   });
 
-  // /discard — cancel an active work session
+  // /discard - cancel an active work session
   bot.command("discard", async (ctx) => {
     const userId = ctx.from?.id;
     const chatId = ctx.chat?.id;
@@ -131,7 +131,7 @@ export function registerWorkHandlers(bot: {
     }
   });
 
-  // /done — end a work session
+  // /done - end a work session
   bot.command("done", async (ctx) => {
     const userId = ctx.from?.id;
     const chatId = ctx.chat?.id;
@@ -162,7 +162,7 @@ export function registerWorkHandlers(bot: {
   });
 
 
-  // /undo — revert the last uninvoiced work session
+  // /undo - revert the last uninvoiced work session
   bot.command("undo", async (ctx) => {
     const userId = ctx.from?.id;
     const chatId = ctx.chat?.id;

@@ -1,7 +1,7 @@
 /**
  * grammY bot setup.
  * Creates the bot instance with all command handlers registered.
- * Does NOT call bot.start() — this is for webhook/queue processing only.
+ * Does NOT call bot.start() - this is for webhook/queue processing only.
  *
  * The bot receives a HandlerContext so handlers can access D1/KV
  * without module-level mutable state.
@@ -58,7 +58,7 @@ export function createBot(
     await next();
   });
 
-  // Rate limiting middleware — drop excessive commands
+  // Rate limiting middleware - drop excessive commands
   bot.use(async (ctx, next) => {
     const userId = ctx.from?.id;
     if (userId) {
@@ -85,7 +85,7 @@ export function createBot(
   registerChatCleanupHandler(bot);
   registerHelpHandler(bot);
 
-  // Catch-all for unhandled errors — notify user + log
+  // Catch-all for unhandled errors - notify user + log
   bot.catch(async (err) => {
     console.error("Bot handler error:", err.error);
     try {

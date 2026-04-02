@@ -2,7 +2,7 @@
 
 Howdy! 🐴 I'm **Tom's Bill Bot**, your personal, high-concurrency, serverless Telegram assistant built on Cloudflare Workers for tracking work hours and invoicing. 
 
-I'm designed to help freelancers and teams clock time across different Telegram groups, ensure exact idempotent updates, and manage crypto-invoicing seamlessly—all without breaking a sweat over scaling issues! 🤖
+I'm designed to help freelancers and teams clock time across different Telegram groups, ensure exact idempotent updates, and manage crypto-invoicing seamlessly-all without breaking a sweat over scaling issues! 🤖
 
 ## 💡 Philosophy
 
@@ -12,7 +12,7 @@ By default, billing is calculated in 30-minute increments, as real work rarely f
 
 ## 🤖 Try It Now
 
-👉 **[@TomsBillBot](https://t.me/TomsBillBot)** — Free to use, open to everyone.
+👉 **[@TomsBillBot](https://t.me/TomsBillBot)** - Free to use, open to everyone.
 
 ## 🏗️ Architecture & Tech Stack
 
@@ -35,30 +35,30 @@ The bot uses a **stateless webhook-to-queue architecture** to decouple the fast 
 ## ✨ Features and Commands
 
 ### ⚙️ User Configuration (DM & Group)
-- `/settings` — **Interactive Dashboard** (Recommended). Manage your rate, granularity, and payment details via a visual menu.
-- `/setrate <amount>` — Set your hourly rate (e.g., `/setrate 50`).
-- `/setaddress <address>` — Set your payment address (e.g., USDT address).
-- `/setremark <text>` — Set a custom note shown on your invoices.
-- `/setgranularity <minutes>` — Set billing time granularity (e.g., `30` for 30-minute blocks).
-- `/export` — (DM only) Download your entire history of invoices and sessions as CSV files.
+- `/settings` - **Interactive Dashboard** (Recommended). Manage your rate, granularity, and payment details via a visual menu.
+- `/setrate <amount>` - Set your hourly rate (e.g., `/setrate 50`).
+- `/setaddress <address>` - Set your payment address (e.g., USDT address).
+- `/setremark <text>` - Set a custom note shown on your invoices.
+- `/setgranularity <minutes>` - Set billing time granularity (e.g., `30` for 30-minute blocks).
+- `/export` - (DM only) Download your entire history of invoices and sessions as CSV files.
 
 ### ⏱️ Work Tracking (Group Commands)
-- `/work` — Start a new work session timer.
-- `/work <hours>` — **Manual Log**. Record a specific duration (e.g., `/work 1.5`).
-- `/done` — End your active work session and record the duration.
-- `/discard` — Cancel your currently active timer without saving it.
-- `/undo` — Revert your last recorded session or active timer.
+- `/work` - Start a new work session timer.
+- `/work <hours>` - **Manual Log**. Record a specific duration (e.g., `/work 1.5`).
+- `/done` - End your active work session and record the duration.
+- `/discard` - Cancel your currently active timer without saving it.
+- `/undo` - Revert your last recorded session or active timer.
 
 ### 🧾 Invoicing & Payments
-- `/invoice` — Generate an invoice from all uninvoiced sessions.
-- `/sessions` — List all uninvoiced work sessions before billing.
-- `/invoices` — List the 5 most recent invoices with inline **Void** and **Pay** buttons.
-- `/void <id>` — Cancel a specific invoice (author only).
-- `/balance` — Check your credit/debit balance from past invoices and payments.
-- `/paid <amount>` — Record a payment against your current unpaid balance.
-- `/settle` — Automatically record a payment for your entire outstanding balance.
-- `/stats` — View your weekly and monthly work statistics and estimated earnings.
-- `/reset` — Reset all historical data (sessions, invoices, payments) for the current group.
+- `/invoice` - Generate an invoice from all uninvoiced sessions.
+- `/sessions` - List all uninvoiced work sessions before billing.
+- `/invoices` - List the 5 most recent invoices with inline **Void** and **Pay** buttons.
+- `/void <id>` - Cancel a specific invoice (author only).
+- `/balance` - Check your credit/debit balance from past invoices and payments.
+- `/paid <amount>` - Record a payment against your current unpaid balance.
+- `/settle` - Automatically record a payment for your entire outstanding balance.
+- `/stats` - View your weekly and monthly work statistics and estimated earnings.
+- `/reset` - Reset all historical data (sessions, invoices, payments) for the current group.
 
 ## 🚀 Getting Started
 

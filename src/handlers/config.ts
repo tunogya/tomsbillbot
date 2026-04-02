@@ -1,9 +1,9 @@
 /**
  * User configuration handlers.
- * /setrate <hourly_rate>    — Set rate (dollars/hr → stored as cents)
- * /setaddress <address>     — Set payment address
- * /setremark <remark>       — Set invoice remark (stored in customer metadata)
- * /setgranularity <minutes> — Set billing time granularity
+ * /setrate <hourly_rate>    - Set rate (dollars/hr → stored as cents)
+ * /setaddress <address>     - Set payment address
+ * /setremark <remark>       - Set invoice remark (stored in customer metadata)
+ * /setgranularity <minutes> - Set billing time granularity
  */
 
 import { Bot, InlineKeyboard } from "grammy";
@@ -24,7 +24,7 @@ import type { BotContext } from "../env";
 
 export function registerConfigHandlers(bot: Bot<BotContext>): void {
 
-  // /settings — Interactive Dashboard
+  // /settings - Interactive Dashboard
   bot.command("settings", async (ctx) => {
     const userId = ctx.from?.id;
     const chatId = ctx.chat?.id;
@@ -296,10 +296,10 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
       await ctx.reply(
         "Hold your horses! Usage: `/setgranularity <minutes>`\n" +
         "Examples:\n" +
-        "• `/setgranularity 1` — per-minute billing\n" +
-        "• `/setgranularity 5` — per-5-min blocks\n" +
-        "• `/setgranularity 30` — per-half-hour (default)\n" +
-        "• `/setgranularity 60` — per-hour blocks",
+        "• `/setgranularity 1` - per-minute billing\n" +
+        "• `/setgranularity 5` - per-5-min blocks\n" +
+        "• `/setgranularity 30` - per-half-hour (default)\n" +
+        "• `/setgranularity 60` - per-hour blocks",
         { parse_mode: "Markdown" }
       );
       return;

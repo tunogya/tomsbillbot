@@ -31,7 +31,7 @@ app.get("/", (c) => {
   return c.json({ status: "ok", bot: "billbot" });
 });
 
-// Telegram webhook endpoint — STATELESS, no business logic
+// Telegram webhook endpoint - STATELESS, no business logic
 app.post("/webhook", async (c) => {
   // Validate secret token from Telegram
   const secretHeader = c.req.header("X-Telegram-Bot-Api-Secret-Token");
@@ -85,10 +85,10 @@ async function handleQueueBatch(
   batch: MessageBatch<Update>,
   env: AppEnv
 ): Promise<void> {
-  // Create bot once per batch — middleware is registered once
+  // Create bot once per batch - middleware is registered once
   const bot = createBot(env);
 
-  // Initialize bot (loads bot info — cached after first call)
+  // Initialize bot (loads bot info - cached after first call)
   await bot.init();
 
   for (const message of batch.messages) {
@@ -110,7 +110,7 @@ async function handleQueueBatch(
       message.ack();
     } catch (err) {
       console.error(`Error processing update ${update.update_id}:`, err);
-      // Retry by not acking — message will be redelivered
+      // Retry by not acking - message will be redelivered
       message.retry();
     }
   }
@@ -131,7 +131,7 @@ export default {
     await handleQueueBatch(batch, env);
   },
 
-  // Cron Trigger — periodic maintenance tasks
+  // Cron Trigger - periodic maintenance tasks
   async scheduled(
     _event: ScheduledEvent,
     env: AppEnv,

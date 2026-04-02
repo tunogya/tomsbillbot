@@ -1,6 +1,6 @@
 /**
  * Payment handler.
- * /paid <amount> — record a payment.
+ * /paid <amount> - record a payment.
  *
  * Flow (Stripe-inspired):
  * 1. Parse dollar amount → convert to cents
