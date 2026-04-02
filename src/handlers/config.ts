@@ -19,18 +19,18 @@ import {
 } from "../services/db";
 import { invalidateCustomerCache, invalidateRateCache, invalidateGranularityCache } from "../utils/cache";
 import { formatAmount } from "../utils/time";
-import type { HandlerContext } from "../env";
+import type { BotContext } from "../env";
 
 export function registerConfigHandlers(bot: {
-  command: (cmd: string, handler: (ctx: Context) => Promise<void>) => void;
-}, getCtx: () => HandlerContext): void {
+  command: (cmd: string, handler: (ctx: BotContext) => Promise<void>) => void;
+}): void {
 
   // /setrate <amount>
   bot.command("setrate", async (ctx) => {
     const userId = ctx.from?.id;
     if (!userId) return;
 
-    const { db, kv } = getCtx();
+    const { db, kv } = ctx;
     const text = ctx.message?.text ?? "";
     const parts = text.split(/\s+/);
     const rateStr = parts[1];
@@ -76,7 +76,7 @@ export function registerConfigHandlers(bot: {
     const userId = ctx.from?.id;
     if (!userId) return;
 
-    const { db, kv } = getCtx();
+    const { db, kv } = ctx;
     const text = ctx.message?.text ?? "";
     const parts = text.split(/\s+/);
     const address = parts[1];
@@ -108,7 +108,7 @@ export function registerConfigHandlers(bot: {
       return;
     }
 
-    const { db, kv } = getCtx();
+    const { db, kv } = ctx;
     const text = ctx.message?.text ?? "";
     const remark = text.replace(/^\/setremark\s*/, "").trim();
 
@@ -139,7 +139,7 @@ export function registerConfigHandlers(bot: {
     const userId = ctx.from?.id;
     if (!userId) return;
 
-    const { db, kv } = getCtx();
+    const { db, kv } = ctx;
     const text = ctx.message?.text ?? "";
     const parts = text.split(/\s+/);
     const valueStr = parts[1];

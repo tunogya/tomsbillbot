@@ -2,16 +2,16 @@ import type { Context } from "grammy";
 import { upsertCustomer, getDefaultUnitAmount, getGranularity, parseMetadata } from "../services/db";
 import { getCachedCustomer } from "../utils/cache";
 import { formatAmount } from "../utils/time";
-import type { HandlerContext } from "../env";
+import type { BotContext } from "../env";
 
 export function registerStartHandler(bot: {
-  command: (cmd: string, handler: (ctx: Context) => Promise<void>) => void;
-}, getCtx: () => HandlerContext): void {
+  command: (cmd: string, handler: (ctx: BotContext) => Promise<void>) => void;
+}): void {
   bot.command("start", async (ctx) => {
     const userId = ctx.from?.id;
     if (!userId) return;
 
-    const { db, kv } = getCtx();
+    const { db, kv } = ctx;
 
     // Ensure customer exists
     await upsertCustomer(db, userId, ctx.from?.first_name);

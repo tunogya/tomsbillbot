@@ -19,11 +19,11 @@ import {
 } from "../services/db";
 import { nowTs, durationMinutes, formatDuration, formatTimestamp } from "../utils/time";
 import { getCachedGranularity } from "../utils/cache";
-import type { HandlerContext } from "../env";
+import type { BotContext } from "../env";
 
 export function registerWorkHandlers(bot: {
-  command: (cmd: string, handler: (ctx: Context) => Promise<void>) => void;
-}, getCtx: () => HandlerContext): void {
+  command: (cmd: string, handler: (ctx: BotContext) => Promise<void>) => void;
+}): void {
 
   // /work — start a work session
   bot.command("work", async (ctx) => {
@@ -38,7 +38,7 @@ export function registerWorkHandlers(bot: {
       return;
     }
 
-    const { db, kv } = getCtx();
+    const { db, kv } = ctx;
     const userName = ctx.from?.first_name ?? "User";
 
     // Ensure customer exists (cache Telegram display name)
@@ -123,7 +123,7 @@ export function registerWorkHandlers(bot: {
       return;
     }
 
-    const { db } = getCtx();
+    const { db } = ctx;
 
     const deleted = await deleteActiveSession(db, userId, chatId);
     if (deleted) {
@@ -152,7 +152,7 @@ export function registerWorkHandlers(bot: {
       return;
     }
 
-    const { db, kv } = getCtx();
+    const { db, kv } = ctx;
 
     // Find active session
     const session = await getActiveSession(db, userId, chatId);

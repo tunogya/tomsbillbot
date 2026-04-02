@@ -13,11 +13,11 @@
 import type { Context } from "grammy";
 import { recordPayment, getInvoiceSummary } from "../services/db";
 import { formatAmount } from "../utils/time";
-import type { HandlerContext } from "../env";
+import type { BotContext } from "../env";
 
 export function registerPaymentHandler(bot: {
-  command: (cmd: string, handler: (ctx: Context) => Promise<void>) => void;
-}, getCtx: () => HandlerContext): void {
+  command: (cmd: string, handler: (ctx: BotContext) => Promise<void>) => void;
+}): void {
 
   bot.command("paid", async (ctx) => {
     const userId = ctx.from?.id;
@@ -31,7 +31,7 @@ export function registerPaymentHandler(bot: {
       return;
     }
 
-    const { db } = getCtx();
+    const { db } = ctx;
     const text = ctx.message?.text ?? "";
     const parts = text.split(/\s+/);
     const amountStr = parts[1];

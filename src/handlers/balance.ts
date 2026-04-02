@@ -1,13 +1,12 @@
-import { Bot, Context } from "grammy";
+import { Bot } from "grammy";
 import { getBalance } from "../services/db";
 import { formatAmount } from "../utils/time";
-import type { HandlerContext } from "../env";
+import type { BotContext } from "../env";
 
 export function registerBalanceHandler(
-  bot: Bot,
-  getCtx: () => HandlerContext
+  bot: Bot<BotContext>
 ): void {
-  bot.command("balance", async (ctx: Context) => {
+  bot.command("balance", async (ctx: BotContext) => {
     const userId = ctx.from?.id;
     const chatId = ctx.chat?.id;
 
@@ -21,7 +20,7 @@ export function registerBalanceHandler(
     }
 
     try {
-      const { db } = getCtx();
+      const { db } = ctx;
       const balanceCents = await getBalance(db, userId, chatId);
 
       if (balanceCents === 0) {

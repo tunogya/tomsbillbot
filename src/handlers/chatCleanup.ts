@@ -25,7 +25,7 @@ import {
   parseMetadata,
 } from "../services/db";
 import { nowTs, durationMinutes, formatDuration, formatAmount } from "../utils/time";
-import type { HandlerContext } from "../env";
+import type { BotContext } from "../env";
 
 /** Send a Telegram message via Bot API (plain fetch, no grammY needed). */
 async function sendTelegramMessage(
@@ -52,8 +52,7 @@ async function sendTelegramMessage(
 }
 
 export function registerChatCleanupHandler(
-  bot: Bot,
-  getCtx: () => HandlerContext
+  bot: Bot<BotContext>
 ): void {
   bot.on("my_chat_member", async (ctx) => {
     const update = ctx.myChatMember;
@@ -70,7 +69,7 @@ export function registerChatCleanupHandler(
 
     const chatId = update.chat.id;
     const chatTitle = ("title" in update.chat ? update.chat.title : null) ?? `Chat ${chatId}`;
-    const { db, botToken } = getCtx();
+    const { db, botToken } = ctx;
 
     try {
       // ── Step 1: Auto-complete active work sessions ──────────────

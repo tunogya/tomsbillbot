@@ -18,20 +18,26 @@ import { registerBalanceHandler } from "./handlers/balance";
 import { registerChatCleanupHandler } from "./handlers/chatCleanup";
 import { registerHelpHandler } from "./handlers/help";
 import { checkRateLimit } from "./utils/ratelimit";
-import type { HandlerContext } from "./env";
+import type { AppEnv, BotContext } from "./env";
 
 /**
  * Creates and configures a grammY Bot instance.
  *
- * `getCtx` returns the HandlerContext (DB, KV) for the current update.
- * This is a function so the consumer can swap bindings per-update
- * while reusing the same Bot instance across a queue batch.
+ * `env` bindings are injected into the custom BotContext
+ * via a global middleware, so all handlers have access to DB/KV.
  */
 export function createBot(
-  token: string,
-  getCtx: () => HandlerContext
-): Bot {
-  const bot = new Bot(token);
+  env: AppEnv
+): Bot<BotContext> {
+  const bot = new Bot<BotContext>(env.BOT_TOKEN);
+
+  // Inject bindings into context
+  bot.use(async (ctx, next) => {
+    ctx.db = env.DB;
+    ctx.kv = env.KV;
+    ctx.botToken = env.BOT_TOKEN;
+    await next();
+  });
 
   // Global middleware to force "reply" (quote) on all responses in groups
   bot.use(async (ctx, next) => {
@@ -54,8 +60,7 @@ export function createBot(
   bot.use(async (ctx, next) => {
     const userId = ctx.from?.id;
     if (userId) {
-      const { kv } = getCtx();
-      const allowed = await checkRateLimit(kv, userId);
+      const allowed = await checkRateLimit(ctx.kv, userId);
       if (!allowed) {
         await ctx.reply("Whoa there! You're sending commands too fast. Please slow down.");
         return;
@@ -66,14 +71,14 @@ export function createBot(
 
 
   // Register all command handlers
-  registerStartHandler(bot, getCtx);
-  registerConfigHandlers(bot, getCtx);
-  registerWorkHandlers(bot, getCtx);
-  registerInvoiceHandler(bot, getCtx);
-  registerPaymentHandler(bot, getCtx);
-  registerResetHandler(bot, getCtx);
-  registerBalanceHandler(bot, getCtx);
-  registerChatCleanupHandler(bot, getCtx);
+  registerStartHandler(bot);
+  registerConfigHandlers(bot);
+  registerWorkHandlers(bot);
+  registerInvoiceHandler(bot);
+  registerPaymentHandler(bot);
+  registerResetHandler(bot);
+  registerBalanceHandler(bot);
+  registerChatCleanupHandler(bot);
   registerHelpHandler(bot);
 
   // Catch-all for unhandled errors — notify user + log

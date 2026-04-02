@@ -19,7 +19,7 @@ import { Hono } from "hono";
 import { createBot } from "./bot";
 import { isDuplicate, markProcessed } from "./utils/idempotency";
 import { handleScheduled } from "./services/scheduled";
-import type { AppEnv, HandlerContext } from "./env";
+import type { AppEnv } from "./env";
 import type { Update } from "grammy/types";
 
 // ─── Hono App (Webhook Receiver) ──────────────────────────────────
@@ -76,29 +76,17 @@ app.post("/webhook", async (c) => {
 /**
  * Per-update handler context.
  *
- * We store the current HandlerContext in a module-level variable before
- * each bot.handleUpdate() call so the registered grammY middleware can
- * access bindings. This is safe because:
- *
- * 1. Workers process one queue batch at a time within a single isolate.
- * 2. We await each handleUpdate() sequentially within the batch loop.
- * 3. The variable is reset in a `finally` block after each update.
+ * We now use grammY's built-in Custom Context (BotContext) to pass
+ * bindings (DB, KV) to handlers. This avoids any global/module-level
+ * mutable state and makes the code thread-safe and cleaner.
  */
-let currentCtx: HandlerContext | null = null;
-
-function getHandlerContext(): HandlerContext {
-  if (!currentCtx) {
-    throw new Error("HandlerContext not available — called outside queue consumer");
-  }
-  return currentCtx;
-}
 
 async function handleQueueBatch(
   batch: MessageBatch<Update>,
   env: AppEnv
 ): Promise<void> {
   // Create bot once per batch — middleware is registered once
-  const bot = createBot(env.BOT_TOKEN, getHandlerContext);
+  const bot = createBot(env);
 
   // Initialize bot (loads bot info — cached after first call)
   await bot.init();
@@ -114,9 +102,6 @@ async function handleQueueBatch(
         continue;
       }
 
-      // Set the handler context for this update
-      currentCtx = { db: env.DB, kv: env.KV, botToken: env.BOT_TOKEN };
-
       await bot.handleUpdate(update);
 
       // Mark as processed for idempotency
@@ -127,8 +112,6 @@ async function handleQueueBatch(
       console.error(`Error processing update ${update.update_id}:`, err);
       // Retry by not acking — message will be redelivered
       message.retry();
-    } finally {
-      currentCtx = null;
     }
   }
 }

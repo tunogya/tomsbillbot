@@ -22,11 +22,11 @@ import {
 } from "../services/db";
 import { getCachedCustomer, getCachedUnitAmount } from "../utils/cache";
 import { formatAmount, formatDuration, formatTimestamp } from "../utils/time";
-import type { HandlerContext } from "../env";
+import type { BotContext } from "../env";
 
 export function registerInvoiceHandler(bot: {
-  command: (cmd: string, handler: (ctx: Context) => Promise<void>) => void;
-}, getCtx: () => HandlerContext): void {
+  command: (cmd: string, handler: (ctx: BotContext) => Promise<void>) => void;
+}): void {
 
   bot.command("newinvoice", async (ctx) => {
     const userId = ctx.from?.id;
@@ -40,7 +40,7 @@ export function registerInvoiceHandler(bot: {
       return;
     }
 
-    const { db, kv } = getCtx();
+    const { db, kv } = ctx;
 
     // Get customer (cached)
     const customer = await getCachedCustomer(kv, db, userId);
@@ -112,7 +112,7 @@ export function registerInvoiceHandler(bot: {
       return;
     }
 
-    const { db } = getCtx();
+    const { db } = ctx;
     const invoices = await getRecentInvoices(db, userId, chatId, 5);
 
     if (invoices.length === 0) {
@@ -159,7 +159,7 @@ export function registerInvoiceHandler(bot: {
       return;
     }
 
-    const { db } = getCtx();
+    const { db } = ctx;
 
     try {
       await voidInvoice(db, invoiceId, userId, chatId);

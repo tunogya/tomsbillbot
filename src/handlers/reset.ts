@@ -1,12 +1,10 @@
-import type { Context } from "grammy";
+import type { BotContext } from "../env";
 import { resetGroupData } from "../services/db";
-import type { HandlerContext } from "../env";
 
 export function registerResetHandler(
   bot: {
-    command: (cmd: string, handler: (ctx: Context) => Promise<void>) => void;
-  },
-  getCtx: () => HandlerContext
+    command: (cmd: string, handler: (ctx: BotContext) => Promise<void>) => void;
+  }
 ): void {
   bot.command("reset", async (ctx) => {
     if (!ctx.chat || ctx.chat.type === "private") {
@@ -32,7 +30,7 @@ export function registerResetHandler(
     }
 
     const chatId = ctx.chat.id;
-    const { db } = getCtx();
+    const { db } = ctx;
 
     try {
       await resetGroupData(db, chatId);

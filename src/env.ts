@@ -13,7 +13,9 @@ export interface AppEnv {
  * Context passed to all handlers, providing access to
  * environment bindings without module-level mutable state.
  */
-export interface HandlerContext {
+import type { Context } from "grammy";
+
+export interface BotContext extends Context {
   db: D1Database;
   kv: KVNamespace;
   botToken: string;
