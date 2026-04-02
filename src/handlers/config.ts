@@ -31,16 +31,19 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
     if (!userId || !chatId) return;
 
     const { db, kv } = ctx;
-    await upsertCustomer(db, userId, ctx.from?.first_name);
 
-    const customer = await getCustomer(db, userId);
+    const targetChatId = ctx.chat.type === "private" ? 0 : chatId;
+
+    // Fetch dependencies in parallel
+    const [customer, unitAmount, granularity] = await Promise.all([
+      getCustomer(db, userId),
+      getCachedUnitAmount(kv, db, userId, targetChatId),
+      getCachedGranularity(kv, db, userId, targetChatId)
+    ]);
+
     const address = customer?.payment_address || "Not set";
     const metadata = customer ? parseMetadata(customer.metadata) : {};
     const remark = metadata.remark || "Not set";
-
-    const targetChatId = ctx.chat.type === "private" ? 0 : chatId;
-    const unitAmount = await getCachedUnitAmount(kv, db, userId, targetChatId);
-    const granularity = await getCachedGranularity(kv, db, userId, targetChatId);
 
     const scope = ctx.chat.type === "private" ? "Default" : "Group";
     const rateStr = unitAmount > 0 ? `${formatAmount(unitAmount)}/hr` : "Not set";

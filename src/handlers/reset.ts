@@ -1,18 +1,15 @@
 import type { BotContext } from "../env";
 import { resetGroupData } from "../services/db";
 
+import { ensureGroupChat } from "../utils/bot";
+
 export function registerResetHandler(
   bot: {
     command: (cmd: string, handler: (ctx: BotContext) => Promise<void>) => void;
   }
 ): void {
   bot.command("reset", async (ctx) => {
-    if (!ctx.chat || ctx.chat.type === "private") {
-      await ctx.reply("Tom's Bill Bot needs to be in a group chat to `/reset` data.", {
-        parse_mode: "Markdown",
-      });
-      return;
-    }
+    if (!await ensureGroupChat(ctx, "reset")) return;
 
     // Only group admins / creators can reset data
     const userId = ctx.from?.id;

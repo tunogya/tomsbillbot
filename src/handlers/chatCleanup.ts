@@ -23,6 +23,8 @@ import {
   getInvoiceSummary,
   getCustomer,
   parseMetadata,
+  SESSION_STATUS,
+  INVOICE_STATUS,
 } from "../services/db";
 import { nowTs, durationMinutes, formatDuration, formatAmount } from "../utils/time";
 import type { BotContext } from "../env";
@@ -80,34 +82,38 @@ export function registerChatCleanupHandler(
       const affectedCustomerIds = new Set<number>();
 
       for (const session of activeSessions) {
+        affectedCustomerIds.add(session.customer_id);
+      }
+
+      // Parallelize granularity fetch and completion
+      await Promise.all(activeSessions.map(async (session) => {
         const granularity = await getGranularity(db, session.customer_id, chatId);
         const duration = durationMinutes(session.start_time, endTime, granularity);
         await completeWorkSession(db, session.id, endTime, duration);
-        affectedCustomerIds.add(session.customer_id);
         console.log(
           `[chatCleanup] Auto-completed session #${session.id} ` +
           `(customer ${session.customer_id}, ${formatDuration(duration)} hrs)`
         );
-      }
+      }));
 
-      // Generate invoices for customers with uninvoiced sessions
-      for (const customerId of affectedCustomerIds) {
+      // Generate invoices for customers with uninvoiced sessions (parallelized)
+      await Promise.all(Array.from(affectedCustomerIds).map(async (customerId) => {
         const uninvoiced = await getUninvoicedSessions(db, customerId, chatId);
-        if (uninvoiced.length === 0) continue;
+        if (uninvoiced.length === 0) return;
 
         const unitAmount = await getUnitAmount(db, customerId, chatId);
         if (unitAmount <= 0) {
           console.warn(
             `[chatCleanup] Skipping invoice for customer ${customerId} — no rate configured`
           );
-          continue;
+          return;
         }
 
         const invoice = await createInvoice(db, customerId, chatId, uninvoiced, unitAmount);
         console.log(
           `[chatCleanup] Auto-created invoice #${invoice.id} for customer ${customerId} ($${formatAmount(invoice.total)})`
         );
-      }
+      }));
 
       // ── Step 2: DM bill backups to users with open invoices ─────
       const openInvoices = await getOpenInvoicesByChat(db, chatId);
@@ -121,9 +127,11 @@ export function registerChatCleanupHandler(
       }
 
       for (const [customerId, invoices] of invoicesByCustomer) {
-        const summary = await getInvoiceSummary(db, customerId, chatId);
+        const [summary, customer] = await Promise.all([
+          getInvoiceSummary(db, customerId, chatId),
+          getCustomer(db, customerId)
+        ]);
         const unpaid = Math.max(0, summary.total_invoiced - summary.total_paid);
-        const customer = await getCustomer(db, customerId);
 
         const lines = [
           `*Bill Backup — ${chatTitle}*`,

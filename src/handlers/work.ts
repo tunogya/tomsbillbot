@@ -17,10 +17,13 @@ import {
   logManualWorkSession,
   deleteActiveSession,
   undoLastWorkSession,
+  SESSION_STATUS,
 } from "../services/db";
-import { nowTs, durationMinutes, formatDuration, formatTimestamp } from "../utils/time";
+import { nowTs, durationMinutes, formatDuration, formatTimestamp, roundToGranularity } from "../utils/time";
 import { getCachedGranularity } from "../utils/cache";
 import type { BotContext } from "../env";
+
+import { ensureGroupChat } from "../utils/bot";
 
 export function registerWorkHandlers(bot: {
   command: (cmd: string, handler: (ctx: BotContext) => Promise<void>) => void;
@@ -32,18 +35,10 @@ export function registerWorkHandlers(bot: {
     const chatId = ctx.chat?.id;
     if (!userId || !chatId) return;
 
-    if (ctx.chat.type === "private") {
-      await ctx.reply("Hey there! Tom's Bill Bot can only process `/work` commands in group chats.", {
-        parse_mode: "Markdown",
-      });
-      return;
-    }
+    if (!await ensureGroupChat(ctx, "work")) return;
 
     const { db, kv } = ctx;
     const userName = ctx.from?.first_name ?? "User";
-
-    // Ensure customer exists (cache Telegram display name)
-    await upsertCustomer(db, userId, userName);
 
     // --- NEW: Handle /work <amount> ---
     const amountStr = ctx.match?.toString().trim();
@@ -57,14 +52,13 @@ export function registerWorkHandlers(bot: {
         return;
       }
 
+      // Ensure customer exists (cache Telegram display name)
+      await upsertCustomer(db, userId, userName);
+
       // Calculate final duration with user-configured granularity
       const granularity = await getCachedGranularity(kv, db, userId, chatId);
       const rawMins = Math.round(amount * 60);
-
-      // We use durationMinutes helper to ensure rounding up to granularity block
-      // To use it, we need a dummy start/end range that spans rawMins
-      const now = nowTs();
-      const duration = durationMinutes(now - rawMins * 60, now, granularity);
+      const duration = roundToGranularity(rawMins, granularity);
 
       try {
         await logManualWorkSession(db, userId, chatId, duration);
@@ -92,6 +86,8 @@ export function registerWorkHandlers(bot: {
     }
 
     try {
+      // Ensure customer exists (cache Telegram display name)
+      await upsertCustomer(db, userId, userName);
       const session = await startWorkSession(db, userId, chatId);
 
       await ctx.reply(
@@ -117,12 +113,7 @@ export function registerWorkHandlers(bot: {
     const chatId = ctx.chat?.id;
     if (!userId || !chatId) return;
 
-    if (ctx.chat.type === "private") {
-      await ctx.reply("Hey there! Tom's Bill Bot can only process `/discard` commands in group chats.", {
-        parse_mode: "Markdown",
-      });
-      return;
-    }
+    if (!await ensureGroupChat(ctx, "discard")) return;
 
     const { db } = ctx;
 
@@ -146,12 +137,7 @@ export function registerWorkHandlers(bot: {
     const chatId = ctx.chat?.id;
     if (!userId || !chatId) return;
 
-    if (ctx.chat.type === "private") {
-      await ctx.reply("Hey there! Tom's Bill Bot can only process `/done` commands in group chats.", {
-        parse_mode: "Markdown",
-      });
-      return;
-    }
+    if (!await ensureGroupChat(ctx, "done")) return;
 
     const { db, kv } = ctx;
 
@@ -182,12 +168,7 @@ export function registerWorkHandlers(bot: {
     const chatId = ctx.chat?.id;
     if (!userId || !chatId) return;
 
-    if (ctx.chat.type === "private") {
-      await ctx.reply("Hey there! Tom's Bill Bot can only process `/undo` commands in group chats.", {
-        parse_mode: "Markdown",
-      });
-      return;
-    }
+    if (!await ensureGroupChat(ctx, "undo")) return;
 
     const { db } = ctx;
 

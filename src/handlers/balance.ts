@@ -3,6 +3,8 @@ import { getBalance } from "../services/db";
 import { formatAmount } from "../utils/time";
 import type { BotContext } from "../env";
 
+import { ensureGroupChat } from "../utils/bot";
+
 export function registerBalanceHandler(
   bot: Bot<BotContext>
 ): void {
@@ -14,10 +16,7 @@ export function registerBalanceHandler(
       return;
     }
 
-    if (ctx.chat?.type === "private") {
-      await ctx.reply("Tom's Bill Bot can only check balances in group chats.");
-      return;
-    }
+    if (!await ensureGroupChat(ctx, "balance")) return;
 
     try {
       const { db } = ctx;

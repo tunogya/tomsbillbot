@@ -15,6 +15,8 @@ import { recordPayment, getInvoiceSummary } from "../services/db";
 import { formatAmount } from "../utils/time";
 import type { BotContext } from "../env";
 
+import { ensureGroupChat } from "../utils/bot";
+
 export function registerPaymentHandler(bot: {
   command: (cmd: string, handler: (ctx: BotContext) => Promise<void>) => void;
 }): void {
@@ -24,12 +26,7 @@ export function registerPaymentHandler(bot: {
     const chatId = ctx.chat?.id;
     if (!userId || !chatId) return;
 
-    if (ctx.chat.type === "private") {
-      await ctx.reply("Hey there! Tom's Bill Bot needs to be in a group chat to process the `/paid` command.", {
-        parse_mode: "Markdown",
-      });
-      return;
-    }
+    if (!await ensureGroupChat(ctx, "paid")) return;
 
     const { db } = ctx;
     const text = ctx.message?.text ?? "";
@@ -92,12 +89,7 @@ export function registerPaymentHandler(bot: {
     const chatId = ctx.chat?.id;
     if (!userId || !chatId) return;
 
-    if (ctx.chat.type === "private") {
-      await ctx.reply("Hey there! Tom's Bill Bot needs to be in a group chat to process the `/settle` command.", {
-        parse_mode: "Markdown",
-      });
-      return;
-    }
+    if (!await ensureGroupChat(ctx, "settle")) return;
 
     const { db } = ctx;
 

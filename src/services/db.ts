@@ -14,6 +14,31 @@
 
 import { nowTs, computeAmount } from "../utils/time";
 
+// ─── Constants ────────────────────────────────────────────────────
+
+export const SESSION_STATUS = {
+  ACTIVE: 'active',
+  COMPLETED: 'completed'
+} as const;
+
+export const INVOICE_STATUS = {
+  DRAFT: 'draft',
+  OPEN: 'open',
+  PAID: 'paid',
+  VOID: 'void'
+} as const;
+
+export const PAYMENT_STATUS = {
+  SUCCEEDED: 'succeeded',
+  REFUNDED: 'refunded'
+} as const;
+
+export const TRANSACTION_TYPE = {
+  INVOICE: 'invoice',
+  PAYMENT: 'payment',
+  ADJUSTMENT: 'adjustment'
+} as const;
+
 // ─── Types ────────────────────────────────────────────────────────
 
 export interface Customer {
@@ -341,10 +366,10 @@ export async function getActiveSession(
   const result = await db
     .prepare(
       `SELECT id, start_time FROM work_sessions
-       WHERE customer_id = ? AND chat_id = ? AND status = 'active'
+       WHERE customer_id = ? AND chat_id = ? AND status = ?
        LIMIT 1`
     )
-    .bind(customerId, chatId)
+    .bind(customerId, chatId, SESSION_STATUS.ACTIVE)
     .first<{ id: number; start_time: number }>();
   return result ?? null;
 }
@@ -358,11 +383,11 @@ export async function deleteActiveSession(
   const result = await db
     .prepare(
       `DELETE FROM work_sessions
-       WHERE customer_id = ? AND chat_id = ? AND status = 'active'`
+       WHERE customer_id = ? AND chat_id = ? AND status = ?`
     )
-    .bind(customerId, chatId)
+    .bind(customerId, chatId, SESSION_STATUS.ACTIVE)
     .run();
-  
+
   return (result.meta.changes ?? 0) > 0;
 }
 
@@ -379,10 +404,10 @@ export async function startWorkSession(
   const result = await db
     .prepare(
       `INSERT INTO work_sessions (customer_id, chat_id, status, start_time, created)
-       VALUES (?, ?, 'active', ?, ?)
+       VALUES (?, ?, ?, ?, ?)
        RETURNING id, start_time`
     )
-    .bind(customerId, chatId, ts, ts)
+    .bind(customerId, chatId, SESSION_STATUS.ACTIVE, ts, ts)
     .first<{ id: number; start_time: number }>();
 
   if (!result) throw new Error("Failed to create work session");
@@ -399,10 +424,10 @@ export async function completeWorkSession(
   await db
     .prepare(
       `UPDATE work_sessions
-       SET status = 'completed', end_time = ?, duration_minutes = ?
+       SET status = ?, end_time = ?, duration_minutes = ?
        WHERE id = ?`
     )
-    .bind(endTime, durationMins, sessionId)
+    .bind(SESSION_STATUS.COMPLETED, endTime, durationMins, sessionId)
     .run();
 }
 
@@ -422,10 +447,10 @@ export async function logManualWorkSession(
   const result = await db
     .prepare(
       `INSERT INTO work_sessions (customer_id, chat_id, status, start_time, end_time, duration_minutes, created)
-       VALUES (?, ?, 'completed', ?, ?, ?, ?)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
        RETURNING id, start_time, end_time`
     )
-    .bind(customerId, chatId, startTime, ts, durationMinutes, ts)
+    .bind(customerId, chatId, SESSION_STATUS.COMPLETED, startTime, ts, durationMinutes, ts)
     .first<{ id: number; start_time: number; end_time: number }>();
 
   if (!result) throw new Error("Failed to log manual work session");
@@ -442,10 +467,10 @@ export async function getUninvoicedSessions(
     .prepare(
       `SELECT * FROM work_sessions
        WHERE customer_id = ? AND chat_id = ?
-         AND status = 'completed' AND invoice_id IS NULL
+         AND status = ? AND invoice_id IS NULL
        ORDER BY start_time ASC`
     )
-    .bind(customerId, chatId)
+    .bind(customerId, chatId, SESSION_STATUS.COMPLETED)
     .all<WorkSession>();
   return result.results ?? [];
 }
@@ -458,9 +483,9 @@ export async function getAllActiveSessionsByChat(
   const result = await db
     .prepare(
       `SELECT id, customer_id, start_time FROM work_sessions
-       WHERE chat_id = ? AND status = 'active'`
+       WHERE chat_id = ? AND status = ?`
     )
-    .bind(chatId)
+    .bind(chatId, SESSION_STATUS.ACTIVE)
     .all<{ id: number; customer_id: number; start_time: number }>();
   return result.results ?? [];
 }
@@ -474,10 +499,10 @@ export async function getOpenInvoicesByChat(
     .prepare(
       `SELECT i.*, c.name AS customer_name FROM invoices i
        JOIN customers c ON i.customer_id = c.id
-       WHERE i.chat_id = ? AND i.status = 'open'
+       WHERE i.chat_id = ? AND i.status = ?
        ORDER BY i.created DESC`
     )
-    .bind(chatId)
+    .bind(chatId, INVOICE_STATUS.OPEN)
     .all<Invoice & { customer_name: string }>();
   return result.results ?? [];
 }
@@ -531,10 +556,10 @@ export async function createInvoice(
         customer_id, chat_id, status, currency,
         subtotal, total, amount_paid, amount_due,
         period_start, period_end, created, finalized_at
-      ) VALUES (?, ?, 'open', 'USD', ?, ?, 0, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, 'USD', ?, ?, 0, ?, ?, ?, ?, ?)
       RETURNING *`
     )
-    .bind(customerId, chatId, subtotal, total, total, periodStart, periodEnd, ts, ts)
+    .bind(customerId, chatId, INVOICE_STATUS.OPEN, subtotal, total, total, periodStart, periodEnd, ts, ts)
     .first<Invoice>();
 
   if (!invoice) throw new Error("Failed to create invoice");
@@ -563,9 +588,9 @@ export async function createInvoice(
     db
       .prepare(
         `INSERT INTO balance_transactions (customer_id, chat_id, type, amount, currency, description, source_type, source_id, created)
-         VALUES (?, ?, 'invoice', ?, 'USD', ?, 'invoice', ?, ?)`
+         VALUES (?, ?, ?, ?, 'USD', ?, ?, ?, ?)`
       )
-      .bind(customerId, chatId, total, `Invoice #${invoice.id}`, invoice.id, ts)
+      .bind(customerId, chatId, TRANSACTION_TYPE.INVOICE, total, `Invoice #${invoice.id}`, TRANSACTION_TYPE.INVOICE, invoice.id, ts)
   );
 
   if (stmts.length > 0) {
@@ -584,11 +609,11 @@ export async function getLatestOpenInvoice(
   const result = await db
     .prepare(
       `SELECT * FROM invoices
-       WHERE customer_id = ? AND chat_id = ? AND status = 'open'
+       WHERE customer_id = ? AND chat_id = ? AND status = ?
        ORDER BY created DESC
        LIMIT 1`
     )
-    .bind(customerId, chatId)
+    .bind(customerId, chatId, INVOICE_STATUS.OPEN)
     .first<Invoice>();
   return result ?? null;
 }
@@ -644,7 +669,7 @@ export async function voidInvoice(
   if (!invoice || invoice.customer_id !== customerId || invoice.chat_id !== chatId) {
     throw new Error("Invoice not found or access denied");
   }
-  if (invoice.status === "void") return; // Already voided
+  if (invoice.status === INVOICE_STATUS.VOID) return; // Already voided
 
   const stmts: D1PreparedStatement[] = [];
 
@@ -653,10 +678,10 @@ export async function voidInvoice(
     db
       .prepare(
         `UPDATE invoices
-         SET status = 'void', amount_due = 0, voided_at = ?
+         SET status = ?, amount_due = 0, voided_at = ?
          WHERE id = ?`
       )
-      .bind(ts, invoiceId)
+      .bind(INVOICE_STATUS.VOID, ts, invoiceId)
   );
 
   // Add reversing balance transaction (negative of original total)
@@ -666,9 +691,9 @@ export async function voidInvoice(
     db
       .prepare(
         `INSERT INTO balance_transactions (customer_id, chat_id, type, amount, currency, description, source_type, source_id, created)
-         VALUES (?, ?, 'adjustment', ?, 'USD', ?, 'invoice', ?, ?)`
+         VALUES (?, ?, ?, ?, 'USD', ?, ?, ?, ?)`
       )
-      .bind(customerId, chatId, -invoice.total, `Void Invoice #${invoice.id}`, invoice.id, ts)
+      .bind(customerId, chatId, TRANSACTION_TYPE.ADJUSTMENT, -invoice.total, `Void Invoice #${invoice.id}`, TRANSACTION_TYPE.INVOICE, invoice.id, ts)
   );
 
   await db.batch(stmts);
@@ -684,10 +709,10 @@ export async function getInvoiceSummary(
   const result = await db
     .prepare(
       `SELECT
-        COALESCE((SELECT SUM(total) FROM invoices WHERE customer_id = ?1 AND chat_id = ?2 AND status != 'void'), 0) AS total_invoiced,
-        COALESCE((SELECT SUM(amount) FROM payments WHERE customer_id = ?1 AND chat_id = ?2 AND status = 'succeeded'), 0) AS total_paid`
+        COALESCE((SELECT SUM(total) FROM invoices WHERE customer_id = ?1 AND chat_id = ?2 AND status != ?3), 0) AS total_invoiced,
+        COALESCE((SELECT SUM(amount) FROM payments WHERE customer_id = ?1 AND chat_id = ?2 AND status = ?4), 0) AS total_paid`
     )
-    .bind(customerId, chatId)
+    .bind(customerId, chatId, INVOICE_STATUS.VOID, PAYMENT_STATUS.SUCCEEDED)
     .first<{ total_invoiced: number; total_paid: number }>();
 
   return {
@@ -741,10 +766,10 @@ export async function recordPayment(
   const payment = await db
     .prepare(
       `INSERT INTO payments (customer_id, chat_id, invoice_id, amount, currency, status, created)
-       VALUES (?, ?, ?, ?, 'USD', 'succeeded', ?)
+       VALUES (?, ?, ?, ?, 'USD', ?, ?)
        RETURNING *`
     )
-    .bind(customerId, chatId, invoiceId, amountCents, ts)
+    .bind(customerId, chatId, invoiceId, amountCents, PAYMENT_STATUS.SUCCEEDED, ts)
     .first<Payment>();
 
   if (!payment) throw new Error("Failed to record payment");
@@ -756,8 +781,8 @@ export async function recordPayment(
   if (openInvoice && invoiceId) {
     const newPaid = openInvoice.amount_paid + amountCents;
     const newDue = Math.max(0, openInvoice.total - newPaid);
-    const newStatus = newDue <= 0 ? "paid" : "open";
-    const paidAt = newStatus === "paid" ? ts : null;
+    const newStatus = newDue <= 0 ? INVOICE_STATUS.PAID : INVOICE_STATUS.OPEN;
+    const paidAt = newStatus === INVOICE_STATUS.PAID ? ts : null;
 
     stmts.push(
       db
@@ -783,9 +808,9 @@ export async function recordPayment(
     db
       .prepare(
         `INSERT INTO balance_transactions (customer_id, chat_id, type, amount, currency, description, source_type, source_id, created)
-         VALUES (?, ?, 'payment', ?, 'USD', ?, 'payment', ?, ?)`
+         VALUES (?, ?, ?, ?, 'USD', ?, ?, ?, ?)`
       )
-      .bind(customerId, chatId, -amountCents, `Payment #${payment.id}`, payment.id, ts)
+      .bind(customerId, chatId, TRANSACTION_TYPE.PAYMENT, -amountCents, `Payment #${payment.id}`, TRANSACTION_TYPE.PAYMENT, payment.id, ts)
   );
 
   if (stmts.length > 0) {
@@ -828,9 +853,9 @@ export async function getStats(
          SUM(duration_minutes) as total_minutes,
          SUM(CASE WHEN invoice_id IS NULL THEN duration_minutes ELSE 0 END) as unbilled_minutes
        FROM work_sessions
-       WHERE customer_id = ? AND chat_id = ? AND start_time >= ? AND status = 'completed'`
+       WHERE customer_id = ? AND chat_id = ? AND start_time >= ? AND status = ?`
     )
-    .bind(customerId, chatId, sinceTs)
+    .bind(customerId, chatId, sinceTs, SESSION_STATUS.COMPLETED)
     .first<{ total_minutes: number; unbilled_minutes: number }>();
 
   return {
@@ -860,4 +885,18 @@ export async function getAllWorkSessionsForExport(
     .bind(customerId)
     .all();
   return results || [];
+}
+
+/** Get specific invoice balance (amount due). */
+export async function getInvoiceAmountDue(
+  db: D1Database,
+  invoiceId: number,
+  customerId: number,
+  chatId: number
+): Promise<number> {
+  const result = await db
+    .prepare("SELECT amount_due FROM invoices WHERE id = ? AND customer_id = ? AND chat_id = ?")
+    .bind(invoiceId, customerId, chatId)
+    .first<{ amount_due: number }>();
+  return result?.amount_due ?? 0;
 }

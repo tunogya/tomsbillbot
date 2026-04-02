@@ -4,22 +4,41 @@
  * All amounts are in cents (integer).
  */
 
+/** Time constants. */
+export const WEEK_IN_SECONDS = 7 * 24 * 60 * 60;
+export const MONTH_IN_SECONDS = 30 * 24 * 60 * 60;
+
 /** Returns current time as Unix timestamp (seconds). */
 export function nowTs(): number {
   return Math.floor(Date.now() / 1000);
 }
 
 /**
+ * Rounds duration in minutes up to the nearest granularity block.
+ * @param granularityMinutes — billing granularity in minutes (default: 30).
+ */
+export function roundToGranularity(minutes: number, granularityMinutes: number = 30): number {
+  if (minutes <= 0) return 0;
+  const periods = Math.ceil(minutes / granularityMinutes);
+  return Math.max(granularityMinutes, periods * granularityMinutes);
+}
+
+/**
  * Computes duration in minutes between two Unix timestamps.
  * Billing rule: rounds up to the nearest granularity block.
  * @param granularityMinutes — billing granularity in minutes (default: 30).
- *   Examples: 1 = per-minute, 5 = per-5-min, 30 = per-half-hour, 60 = per-hour.
  */
 export function durationMinutes(startTs: number, endTs: number, granularityMinutes: number = 30): number {
   if (endTs <= startTs) return 0;
   const exactMinutes = Math.floor((endTs - startTs) / 60);
-  const periods = Math.ceil(exactMinutes / granularityMinutes);
-  return Math.max(granularityMinutes, periods * granularityMinutes);
+  return roundToGranularity(exactMinutes, granularityMinutes);
+}
+
+/**
+ * Sums the total duration in minutes for a list of work sessions.
+ */
+export function sumDurations(sessions: { duration_minutes: number | null }[]): number {
+  return sessions.reduce((sum, s) => sum + (s.duration_minutes ?? 0), 0);
 }
 
 /**

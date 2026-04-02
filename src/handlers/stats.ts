@@ -1,7 +1,7 @@
 import type { BotContext } from "../env";
 import { getStats, getInvoiceSummary } from "../services/db";
 import { getCachedUnitAmount } from "../utils/cache";
-import { nowTs, formatDuration, formatAmount } from "../utils/time";
+import { nowTs, formatDuration, formatAmount, WEEK_IN_SECONDS, MONTH_IN_SECONDS } from "../utils/time";
 
 export function registerStatsHandler(bot: any): void {
   bot.command("stats", async (ctx: BotContext) => {
@@ -18,15 +18,16 @@ export function registerStatsHandler(bot: any): void {
 
     // Calculate timestamps
     const now = nowTs();
-    const oneWeekAgo = now - 7 * 24 * 60 * 60;
-    const oneMonthAgo = now - 30 * 24 * 60 * 60;
+    const oneWeekAgo = now - WEEK_IN_SECONDS;
+    const oneMonthAgo = now - MONTH_IN_SECONDS;
 
-    // Fetch stats
-    const weekStats = await getStats(db, userId, chatId, oneWeekAgo);
-    const monthStats = await getStats(db, userId, chatId, oneMonthAgo);
-    
-    const summary = await getInvoiceSummary(db, userId, chatId);
-    const unitAmount = await getCachedUnitAmount(kv, db, userId, chatId);
+    // Fetch stats in parallel
+    const [weekStats, monthStats, summary, unitAmount] = await Promise.all([
+      getStats(db, userId, chatId, oneWeekAgo),
+      getStats(db, userId, chatId, oneMonthAgo),
+      getInvoiceSummary(db, userId, chatId),
+      getCachedUnitAmount(kv, db, userId, chatId)
+    ]);
 
     const unbilledEarnings = Math.round((weekStats.unbilled_minutes / 60) * unitAmount);
 

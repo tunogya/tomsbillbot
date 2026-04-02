@@ -18,39 +18,40 @@ export function registerExportHandler(bot: Bot<BotContext>): void {
     try {
       await ctx.reply("Generating your export files... Please wait a moment.");
 
-      const invoices = await getAllInvoicesForExport(db, userId);
-      const sessions = await getAllWorkSessionsForExport(db, userId);
+      // Fetch all data in parallel
+      const [invoices, sessions] = await Promise.all([
+        getAllInvoicesForExport(db, userId),
+        getAllWorkSessionsForExport(db, userId)
+      ]);
 
       // Create Invoices CSV
       const invoiceHeaders = ["ID", "Chat ID", "Status", "Total (USD)", "Amount Paid", "Amount Due", "Created Date"];
-      const invoiceRows = invoices.map(inv => [
-        inv.id,
-        inv.chat_id,
-        inv.status,
-        formatAmount(inv.total),
-        formatAmount(inv.amount_paid),
-        formatAmount(inv.amount_due),
-        formatTimestamp(inv.created)
-      ]);
       const invoiceCsv = [
         invoiceHeaders.join(","),
-        ...invoiceRows.map(row => row.join(","))
+        ...invoices.map(inv => [
+          inv.id,
+          inv.chat_id,
+          inv.status,
+          formatAmount(inv.total),
+          formatAmount(inv.amount_paid),
+          formatAmount(inv.amount_due),
+          formatTimestamp(inv.created)
+        ].join(","))
       ].join("\n");
 
       // Create Sessions CSV
       const sessionHeaders = ["ID", "Chat ID", "Status", "Start Time", "End Time", "Duration (Hours)", "Invoice ID"];
-      const sessionRows = sessions.map(s => [
-        s.id,
-        s.chat_id,
-        s.status,
-        formatTimestamp(s.start_time),
-        s.end_time ? formatTimestamp(s.end_time) : "Active",
-        s.duration_minutes ? formatDuration(s.duration_minutes) : "0.0",
-        s.invoice_id || "Uninvoiced"
-      ]);
       const sessionCsv = [
         sessionHeaders.join(","),
-        ...sessionRows.map(row => row.join(","))
+        ...sessions.map(s => [
+          s.id,
+          s.chat_id,
+          s.status,
+          formatTimestamp(s.start_time),
+          s.end_time ? formatTimestamp(s.end_time) : "Active",
+          s.duration_minutes ? formatDuration(s.duration_minutes) : "0.0",
+          s.invoice_id || "Uninvoiced"
+        ].join(","))
       ].join("\n");
 
       // Send files

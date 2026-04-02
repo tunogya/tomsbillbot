@@ -17,13 +17,17 @@ import {
   createInvoice,
   getInvoiceSummary,
   getRecentInvoices,
+  getInvoiceAmountDue,
   parseMetadata,
   voidInvoice,
   recordPayment,
+  INVOICE_STATUS,
 } from "../services/db";
 import { getCachedCustomer, getCachedUnitAmount } from "../utils/cache";
-import { formatAmount, formatDuration, formatTimestamp } from "../utils/time";
+import { formatAmount, formatDuration, formatTimestamp, sumDurations } from "../utils/time";
 import type { BotContext } from "../env";
+
+import { ensureGroupChat } from "../utils/bot";
 
 export function registerInvoiceHandler(bot: Bot<BotContext>): void {
 
@@ -32,20 +36,15 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
     const chatId = ctx.chat?.id;
     if (!userId || !chatId) return;
 
-    if (ctx.chat.type === "private") {
-      await ctx.reply("Hey there! Tom's Bill Bot can only generate invoices in group chats.", {
-        parse_mode: "Markdown",
-      });
-      return;
-    }
+    if (!await ensureGroupChat(ctx, "invoice")) return;
 
     const { db, kv } = ctx;
 
-    // Get customer (cached)
-    const customer = await getCachedCustomer(kv, db, userId);
-
-    // Get unit price (cached, cents/hour) for this chat
-    const unitAmount = await getCachedUnitAmount(kv, db, userId, chatId);
+    // Get customer and unit price (cached) in parallel
+    const [customer, unitAmount] = await Promise.all([
+      getCachedCustomer(kv, db, userId),
+      getCachedUnitAmount(kv, db, userId, chatId)
+    ]);
 
     if (unitAmount <= 0) {
       await ctx.reply(
@@ -70,7 +69,7 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
     const unpaid = summary.total_invoiced - summary.total_paid;
 
     // Calculate total hours for display
-    const totalMinutes = sessions.reduce((sum, s) => sum + (s.duration_minutes ?? 0), 0);
+    const totalMinutes = sumDurations(sessions);
 
     const lines = [
       `*Tom's Bill Bot presents Invoice #${invoice.id}*`,
@@ -104,12 +103,7 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
     const chatId = ctx.chat?.id;
     if (!userId || !chatId) return;
 
-    if (ctx.chat.type === "private") {
-      await ctx.reply("Hey there! Tom's Bill Bot can only show group invoices here.", {
-        parse_mode: "Markdown",
-      });
-      return;
-    }
+    if (!await ensureGroupChat(ctx, "invoices")) return;
 
     const { db } = ctx;
     const invoices = await getRecentInvoices(db, userId, chatId, 5);
@@ -133,7 +127,7 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
     ];
 
     // Find first unpaid invoice to show buttons for
-    const unpaidInvoice = invoices.find(inv => inv.status === 'open' || inv.status === 'draft');
+    const unpaidInvoice = invoices.find(inv => inv.status === INVOICE_STATUS.OPEN || inv.status === INVOICE_STATUS.DRAFT);
     const options: any = { parse_mode: "Markdown" };
     
     if (unpaidInvoice) {
@@ -150,10 +144,7 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
     const chatId = ctx.chat?.id;
     if (!userId || !chatId) return;
 
-    if (ctx.chat.type === "private") {
-      await ctx.reply("Tom's Bill Bot can only delete group invoices here.");
-      return;
-    }
+    if (!await ensureGroupChat(ctx, "void")) return;
 
     const commandText = ctx.message?.text || "";
     const args = commandText.split(/\s+/);
@@ -191,12 +182,7 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
     const chatId = ctx.chat?.id;
     if (!userId || !chatId) return;
 
-    if (ctx.chat.type === "private") {
-      await ctx.reply("Hey there! Tom's Bill Bot can only show sessions in group chats.", {
-        parse_mode: "Markdown",
-      });
-      return;
-    }
+    if (!await ensureGroupChat(ctx, "sessions")) return;
 
     const { db } = ctx;
 
@@ -207,7 +193,7 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
       return;
     }
 
-    const totalMinutes = sessions.reduce((sum, s) => sum + (s.duration_minutes ?? 0), 0);
+    const totalMinutes = sumDurations(sessions);
 
     const lines = [
       `*Uninvoiced Work Sessions*`,
@@ -266,20 +252,14 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
 
     try {
       // Find the invoice to get the amount due
-      const result = await db.prepare("SELECT amount_due FROM invoices WHERE id = ? AND customer_id = ? AND chat_id = ?")
-        .bind(invoiceId, userId, chatId).first<{ amount_due: number }>();
-        
-      if (!result) {
-        await ctx.answerCallbackQuery({ text: "Invoice not found.", show_alert: true });
-        return;
-      }
-      
-      if (result.amount_due <= 0) {
+      const amountDue = await getInvoiceAmountDue(db, invoiceId, userId, chatId);
+
+      if (amountDue <= 0) {
         await ctx.answerCallbackQuery({ text: "Invoice is already paid or voided.", show_alert: true });
         return;
       }
 
-      await recordPayment(db, userId, chatId, result.amount_due);
+      await recordPayment(db, userId, chatId, amountDue);
       await ctx.answerCallbackQuery({ text: "Payment recorded successfully!", show_alert: true });
       
       if (ctx.callbackQuery.message) {
