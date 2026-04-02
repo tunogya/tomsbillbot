@@ -870,7 +870,7 @@ export async function getAllInvoicesForExport(
   customerId: number
 ): Promise<any[]> {
   const { results } = await db
-    .prepare("SELECT * FROM invoices WHERE customer_id = ? ORDER BY created DESC")
+    .prepare("SELECT id, chat_id, status, total, amount_paid, amount_due, created FROM invoices WHERE customer_id = ? ORDER BY created DESC")
     .bind(customerId)
     .all();
   return results || [];
@@ -881,7 +881,7 @@ export async function getAllWorkSessionsForExport(
   customerId: number
 ): Promise<any[]> {
   const { results } = await db
-    .prepare("SELECT * FROM work_sessions WHERE customer_id = ? ORDER BY created DESC")
+    .prepare("SELECT id, chat_id, status, start_time, end_time, duration_minutes, invoice_id FROM work_sessions WHERE customer_id = ? ORDER BY created DESC")
     .bind(customerId)
     .all();
   return results || [];

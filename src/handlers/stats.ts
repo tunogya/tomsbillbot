@@ -1,7 +1,10 @@
 import type { BotContext } from "../env";
 import { getStats, getInvoiceSummary } from "../services/db";
 import { getCachedUnitAmount } from "../utils/cache";
-import { nowTs, formatDuration, formatAmount, WEEK_IN_SECONDS, MONTH_IN_SECONDS } from "../utils/time";
+import { nowTs, formatDuration, formatAmount, WEEK_IN_SECONDS, MONTH_IN_SECONDS, computeAmount } from "../utils/time";
+import { ensureGroupChat } from "../utils/bot";
+
+import { ensureGroupChat } from "../utils/bot";
 
 export function registerStatsHandler(bot: any): void {
   bot.command("stats", async (ctx: BotContext) => {
@@ -9,10 +12,7 @@ export function registerStatsHandler(bot: any): void {
     const chatId = ctx.chat?.id;
     if (!userId || !chatId) return;
 
-    if (ctx.chat?.type === "private") {
-      await ctx.reply("Tom's Bill Bot can only show stats in group chats.", { parse_mode: "Markdown" });
-      return;
-    }
+    if (!await ensureGroupChat(ctx, "stats")) return;
 
     const { db, kv } = ctx;
 
@@ -29,7 +29,7 @@ export function registerStatsHandler(bot: any): void {
       getCachedUnitAmount(kv, db, userId, chatId)
     ]);
 
-    const unbilledEarnings = Math.round((weekStats.unbilled_minutes / 60) * unitAmount);
+    const unbilledEarnings = computeAmount(weekStats.unbilled_minutes, unitAmount);
 
     const lines = [
       `*Your Work Stats 📊*`,
