@@ -4,14 +4,17 @@
 	"private": true,
 	"dependencies": {
 		"grammy": "^1.35.0",
-		"hono": "4.11.1"
+		"hono": "4.12.10"
 	},
 	"devDependencies": {
-		"@cloudflare/vitest-pool-workers": "0.10.11",
 		"@types/node": "24.10.1",
 		"typescript": "5.9.3",
 		"vitest": "3.2.4",
-		"wrangler": "4.56.0"
+		"wrangler": "4.80.0"
+	},
+	"overrides": {
+		"picomatch": "4.0.4",
+		"rollup": "4.60.1"
 	},
 	"scripts": {
 		"cf-typegen": "wrangler types",
