@@ -69,6 +69,7 @@ export interface WorkSession {
   start_time: number;
   end_time: number | null;
   duration_minutes: number | null;
+  tag: string | null;
   invoice_id: number | null;
   created: number;
 }
@@ -114,6 +115,17 @@ export interface Payment {
   status: string; // 'succeeded' | 'refunded'
   description: string | null;
   metadata: string;
+  created: number;
+}
+
+export interface Expense {
+  id: number;
+  customer_id: number;
+  chat_id: number;
+  amount: number; // cents
+  currency: string;
+  description: string | null;
+  invoice_id: number | null;
   created: number;
 }
 
@@ -398,37 +410,106 @@ export async function deleteActiveSession(
 export async function startWorkSession(
   db: D1Database,
   customerId: number,
-  chatId: number
+  chatId: number,
+  tag: string | null = null
 ): Promise<{ id: number; start_time: number }> {
   const ts = nowTs();
   const result = await db
     .prepare(
-      `INSERT INTO work_sessions (customer_id, chat_id, status, start_time, created)
-       VALUES (?, ?, ?, ?, ?)
+      `INSERT INTO work_sessions (customer_id, chat_id, status, start_time, tag, created)
+       VALUES (?, ?, ?, ?, ?, ?)
        RETURNING id, start_time`
     )
-    .bind(customerId, chatId, SESSION_STATUS.ACTIVE, ts, ts)
+    .bind(customerId, chatId, SESSION_STATUS.ACTIVE, ts, tag, ts)
     .first<{ id: number; start_time: number }>();
 
   if (!result) throw new Error("Failed to create work session");
   return result;
 }
 
-/** Complete a work session. */
 export async function completeWorkSession(
   db: D1Database,
   sessionId: number,
   endTime: number,
   durationMins: number
 ): Promise<void> {
+  // Check if there's an open break and close it
+  const openBreak = await db
+    .prepare(`SELECT id, start_time FROM breaks WHERE work_session_id = ? AND end_time IS NULL`)
+    .bind(sessionId)
+    .first<{ id: number; start_time: number }>();
+
+  if (openBreak) {
+    await resumeWork(db, sessionId);
+  }
+
+  // Calculate total break duration to subtract from total elapsed time if we want exact duration,
+  // but the handler already passes durationMins.
+  // We should probably ensure durationMins is correct if we had breaks.
+  // Actually, the handler calculates duration based on start_time and end_time.
+  // If we have breaks, we should subtract them.
+
+  const breaks = await db
+    .prepare(`SELECT SUM(duration_minutes) as total_break_mins FROM breaks WHERE work_session_id = ?`)
+    .bind(sessionId)
+    .first<{ total_break_mins: number }>();
+
+  const totalBreakMins = breaks?.total_break_mins ?? 0;
+  const finalDuration = Math.max(0, durationMins - totalBreakMins);
+
   await db
     .prepare(
       `UPDATE work_sessions
        SET status = ?, end_time = ?, duration_minutes = ?
        WHERE id = ?`
     )
-    .bind(SESSION_STATUS.COMPLETED, endTime, durationMins, sessionId)
+    .bind(SESSION_STATUS.COMPLETED, endTime, finalDuration, sessionId)
     .run();
+}
+
+/** Start a break for an active work session. */
+export async function startBreak(
+  db: D1Database,
+  sessionId: number
+): Promise<void> {
+  const ts = nowTs();
+  await db
+    .prepare(`INSERT INTO breaks (work_session_id, start_time, created) VALUES (?, ?, ?)`)
+    .bind(sessionId, ts, ts)
+    .run();
+}
+
+/** Resume work from a break. */
+export async function resumeWork(
+  db: D1Database,
+  sessionId: number
+): Promise<void> {
+  const ts = nowTs();
+  const openBreak = await db
+    .prepare(`SELECT id, start_time FROM breaks WHERE work_session_id = ? AND end_time IS NULL`)
+    .bind(sessionId)
+    .first<{ id: number; start_time: number }>();
+
+  if (!openBreak) return;
+
+  const durationMins = Math.floor((ts - openBreak.start_time) / 60);
+
+  await db
+    .prepare(`UPDATE breaks SET end_time = ?, duration_minutes = ? WHERE id = ?`)
+    .bind(ts, durationMins, openBreak.id)
+    .run();
+}
+
+/** Check if a session is currently on break. */
+export async function isOnBreak(
+  db: D1Database,
+  sessionId: number
+): Promise<boolean> {
+  const result = await db
+    .prepare(`SELECT id FROM breaks WHERE work_session_id = ? AND end_time IS NULL`)
+    .bind(sessionId)
+    .first();
+  return !!result;
 }
 
 /**
@@ -439,18 +520,19 @@ export async function logManualWorkSession(
   db: D1Database,
   customerId: number,
   chatId: number,
-  durationMinutes: number
+  durationMinutes: number,
+  tag: string | null = null
 ): Promise<{ id: number; start_time: number; end_time: number }> {
   const ts = nowTs();
   const startTime = ts - durationMinutes * 60;
-  
+
   const result = await db
     .prepare(
-      `INSERT INTO work_sessions (customer_id, chat_id, status, start_time, end_time, duration_minutes, created)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO work_sessions (customer_id, chat_id, status, start_time, end_time, duration_minutes, tag, created)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        RETURNING id, start_time, end_time`
     )
-    .bind(customerId, chatId, SESSION_STATUS.COMPLETED, startTime, ts, durationMinutes, ts)
+    .bind(customerId, chatId, SESSION_STATUS.COMPLETED, startTime, ts, durationMinutes, tag, ts)
     .first<{ id: number; start_time: number; end_time: number }>();
 
   if (!result) throw new Error("Failed to log manual work session");
@@ -461,16 +543,24 @@ export async function logManualWorkSession(
 export async function getUninvoicedSessions(
   db: D1Database,
   customerId: number,
-  chatId: number
+  chatId: number,
+  tag: string | null = null
 ): Promise<WorkSession[]> {
-  const result = await db
-    .prepare(
-      `SELECT * FROM work_sessions
+  let query = `SELECT * FROM work_sessions
        WHERE customer_id = ? AND chat_id = ?
-         AND status = ? AND invoice_id IS NULL
-       ORDER BY start_time ASC`
-    )
-    .bind(customerId, chatId, SESSION_STATUS.COMPLETED)
+         AND status = ? AND invoice_id IS NULL`;
+  const params: any[] = [customerId, chatId, SESSION_STATUS.COMPLETED];
+
+  if (tag) {
+    query += ` AND tag = ?`;
+    params.push(tag);
+  }
+
+  query += ` ORDER BY start_time ASC`;
+
+  const result = await db
+    .prepare(query)
+    .bind(...params)
     .all<WorkSession>();
   return result.results ?? [];
 }
@@ -525,13 +615,14 @@ export async function createInvoice(
   customerId: number,
   chatId: number,
   sessions: WorkSession[],
-  unitAmount: number // cents per hour
+  unitAmount: number, // cents per hour
+  expenses: Expense[] = []
 ): Promise<Invoice> {
   const ts = nowTs();
 
   // Calculate totals
   let subtotal = 0;
-  const lineItems: { sessionId: number; minutes: number; amount: number; description: string }[] = [];
+  const lineItems: { sessionId?: number; expenseId?: number; quantity: number; unitAmount: number; amount: number; description: string }[] = [];
 
   for (const s of sessions) {
     const mins = s.duration_minutes ?? 0;
@@ -539,15 +630,27 @@ export async function createInvoice(
     subtotal += amount;
     lineItems.push({
       sessionId: s.id,
-      minutes: mins,
+      quantity: mins,
+      unitAmount: unitAmount,
       amount,
-      description: `Work session #${s.id}`,
+      description: s.tag ? `Work session #${s.id} [${s.tag}]` : `Work session #${s.id}`,
+    });
+  }
+
+  for (const e of expenses) {
+    subtotal += e.amount;
+    lineItems.push({
+      expenseId: e.id,
+      quantity: 1,
+      unitAmount: e.amount,
+      amount: e.amount,
+      description: `Expense: ${e.description ?? 'Unspecified'}`,
     });
   }
 
   const total = subtotal;
-  const periodStart = sessions.length > 0 ? sessions[0].start_time : ts;
-  const periodEnd = sessions.length > 0 ? sessions[sessions.length - 1].end_time ?? ts : ts;
+  const periodStart = sessions.length > 0 ? sessions[0].start_time : (expenses.length > 0 ? expenses[0].created : ts);
+  const periodEnd = sessions.length > 0 ? sessions[sessions.length - 1].end_time ?? ts : (expenses.length > 0 ? expenses[expenses.length - 1].created : ts);
 
   // Step 1: Insert invoice
   const invoice = await db
@@ -564,7 +667,7 @@ export async function createInvoice(
 
   if (!invoice) throw new Error("Failed to create invoice");
 
-  // Step 2 & 3: Batch insert line items + link sessions
+  // Step 2 & 3: Batch insert line items + link sessions/expenses
   const stmts: D1PreparedStatement[] = [];
 
   for (const item of lineItems) {
@@ -574,13 +677,22 @@ export async function createInvoice(
           `INSERT INTO invoice_line_items (invoice_id, description, quantity, unit_amount, amount, work_session_id, created)
            VALUES (?, ?, ?, ?, ?, ?, ?)`
         )
-        .bind(invoice.id, item.description, item.minutes, unitAmount, item.amount, item.sessionId, ts)
+        .bind(invoice.id, item.description, item.quantity, item.unitAmount, item.amount, item.sessionId ?? null, ts)
     );
-    stmts.push(
-      db
-        .prepare(`UPDATE work_sessions SET invoice_id = ? WHERE id = ?`)
-        .bind(invoice.id, item.sessionId)
-    );
+    if (item.sessionId) {
+      stmts.push(
+        db
+          .prepare(`UPDATE work_sessions SET invoice_id = ? WHERE id = ?`)
+          .bind(invoice.id, item.sessionId)
+      );
+    }
+    if (item.expenseId) {
+      stmts.push(
+        db
+          .prepare(`UPDATE expenses SET invoice_id = ? WHERE id = ?`)
+          .bind(invoice.id, item.expenseId)
+      );
+    }
   }
 
   // Step 4: Create balance transaction (positive = amount receivable)
@@ -748,12 +860,51 @@ export async function getBalance(
 ): Promise<number> {
   const result = await db
     .prepare(
-      `SELECT SUM(amount) AS balance FROM balance_transactions 
+      `SELECT SUM(amount) AS balance FROM balance_transactions
        WHERE customer_id = ? AND chat_id = ?`
     )
     .bind(customerId, chatId)
     .first<{ balance: number }>();
   return result?.balance ?? 0;
+}
+
+// ─── Expense Operations ───────────────────────────────────────────
+
+export async function addExpense(
+  db: D1Database,
+  customerId: number,
+  chatId: number,
+  amount: number,
+  description: string
+): Promise<Expense> {
+  const ts = nowTs();
+  const result = await db
+    .prepare(
+      `INSERT INTO expenses (customer_id, chat_id, amount, description, created)
+       VALUES (?, ?, ?, ?, ?)
+       RETURNING *`
+    )
+    .bind(customerId, chatId, amount, description, ts)
+    .first<Expense>();
+
+  if (!result) throw new Error("Failed to add expense");
+  return result;
+}
+
+export async function getUninvoicedExpenses(
+  db: D1Database,
+  customerId: number,
+  chatId: number
+): Promise<Expense[]> {
+  const result = await db
+    .prepare(
+      `SELECT * FROM expenses
+       WHERE customer_id = ? AND chat_id = ? AND invoice_id IS NULL
+       ORDER BY created ASC`
+    )
+    .bind(customerId, chatId)
+    .all<Expense>();
+  return result.results ?? [];
 }
 
 // ─── Payment Operations ──────────────────────────────────────────
@@ -880,20 +1031,27 @@ export async function getStats(
   db: D1Database,
   customerId: number,
   chatId: number,
-  sinceTs: number
+  sinceTs: number,
+  tag: string | null = null
 ): Promise<{
   total_minutes: number;
   unbilled_minutes: number;
 }> {
-  const result = await db
-    .prepare(
-      `SELECT 
+  let query = `SELECT
          SUM(duration_minutes) as total_minutes,
          SUM(CASE WHEN invoice_id IS NULL THEN duration_minutes ELSE 0 END) as unbilled_minutes
        FROM work_sessions
-       WHERE customer_id = ? AND chat_id = ? AND start_time >= ? AND status = ?`
-    )
-    .bind(customerId, chatId, sinceTs, SESSION_STATUS.COMPLETED)
+       WHERE customer_id = ? AND chat_id = ? AND start_time >= ? AND status = ?`;
+  const params: any[] = [customerId, chatId, sinceTs, SESSION_STATUS.COMPLETED];
+
+  if (tag) {
+    query += ` AND tag = ?`;
+    params.push(tag);
+  }
+
+  const result = await db
+    .prepare(query)
+    .bind(...params)
     .first<{ total_minutes: number; unbilled_minutes: number }>();
 
   return {

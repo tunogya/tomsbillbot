@@ -19,6 +19,9 @@ import {
   undoLastWorkSession,
   getCustomer,
   parseMetadata,
+  startBreak,
+  resumeWork,
+  isOnBreak,
   SESSION_STATUS,
 } from "../services/db";
 import { nowTs, durationMinutes, formatDuration, formatTimestamp, formatTimestampLocal, roundToGranularity } from "../utils/time";
@@ -41,37 +44,68 @@ export function registerWorkHandlers(bot: Bot<BotContext>): void {
     const { db, kv } = ctx;
     const userName = ctx.from?.first_name ?? "User";
 
-    // --- NEW: Handle /work <amount> ---
-    const amountStr = ctx.match?.toString().trim();
-    if (amountStr) {
-      const amount = parseFloat(amountStr);
-      if (isNaN(amount) || amount <= 0) {
+    // --- NEW: Handle /work <amount> [#tag] ---
+    const match = ctx.match?.toString().trim();
+    if (match) {
+      // Parse: /work 1.5 #tag OR /work #tag
+      const tagMatch = match.match(/#(\w+)/);
+      const tag = tagMatch ? tagMatch[1] : null;
+      const amountStr = match.replace(/#\w+/, "").trim();
+
+      if (amountStr) {
+        const amount = parseFloat(amountStr);
+        if (isNaN(amount) || amount <= 0) {
+          await ctx.reply(
+            "Tom's Bill Bot didn't catch that. Please use a positive number for the hours, like <code>/work 1.5</code>.",
+            { parse_mode: "HTML" }
+          );
+          return;
+        }
+
+        // Ensure customer exists (cache Telegram display name)
+        await upsertCustomer(db, userId, userName);
+
+        // Calculate final duration with user-configured granularity
+        const granularity = await getCachedGranularity(kv, db, userId, chatId);
+        const rawMins = Math.round(amount * 60);
+        const duration = roundToGranularity(rawMins, granularity);
+
+        try {
+          await logManualWorkSession(db, userId, chatId, duration, tag);
+          const tagInfo = tag ? ` [Project: #${tag}]` : "";
+          await ctx.reply(
+            "<b>Manual work logged! Tom's Bill Bot is impressed!</b>\n\n" +
+            `Duration: <code>${escapeHtml(formatDuration(duration))} hours</code>${tagInfo}`,
+            { parse_mode: "HTML" }
+          );
+          return;
+        } catch (err) {
+          console.error("Manual work log failed:", err);
+          throw err;
+        }
+      } else if (tag) {
+        // Just /work #tag -> Start timer with tag
+        const existing = await getActiveSession(db, userId, chatId);
+        if (existing) {
+          const customer = await getCustomer(db, userId);
+          const metadata = customer ? parseMetadata(customer.metadata) : {};
+          const tz = metadata.timezone;
+
+          await ctx.reply(
+            `Tom's Bill Bot sees you're already grinding! 💼\nYou have an active session from <code>${escapeHtml(formatTimestampLocal(existing.start_time, tz))}</code>.\nUse /done to clock out first.`,
+            { parse_mode: "HTML" }
+          );
+          return;
+        }
+
+        await upsertCustomer(db, userId, userName);
+        await startWorkSession(db, userId, chatId, tag);
         await ctx.reply(
-          "Tom's Bill Bot didn't catch that. Please use a positive number for the hours, like <code>/work 1.5</code>.",
+          `<b>Work session started for #${tag}! Tom's Bill Bot is on the clock!</b>\n\n` +
+          "Don't forget to use /done when you're finished.",
           { parse_mode: "HTML" }
         );
         return;
-      }
-
-      // Ensure customer exists (cache Telegram display name)
-      await upsertCustomer(db, userId, userName);
-
-      // Calculate final duration with user-configured granularity
-      const granularity = await getCachedGranularity(kv, db, userId, chatId);
-      const rawMins = Math.round(amount * 60);
-      const duration = roundToGranularity(rawMins, granularity);
-
-      try {
-        await logManualWorkSession(db, userId, chatId, duration);
-        await ctx.reply(
-          "<b>Manual work logged! Tom's Bill Bot is impressed!</b>\n\n" +
-          `Duration: <code>${escapeHtml(formatDuration(duration))} hours</code>`,
-          { parse_mode: "HTML" }
-        );
-        return;
-      } catch (err) {
-        console.error("Manual work log failed:", err);
-        throw err;
       }
     }
 
@@ -281,5 +315,53 @@ export function registerWorkHandlers(bot: Bot<BotContext>): void {
     }
     await ctx.editMessageText("Undo cancelled. No data was deleted.");
     await ctx.answerCallbackQuery();
+  });
+
+  // /break - pause current session
+  bot.command("break", async (ctx) => {
+    const userId = ctx.from?.id;
+    const chatId = ctx.chat?.id;
+    if (!userId || !chatId) return;
+
+    if (!await ensureGroupChat(ctx, "break")) return;
+
+    const { db } = ctx;
+    const session = await getActiveSession(db, userId, chatId);
+    if (!session) {
+      await ctx.reply("Tom's Bill Bot doesn't see an active session to pause! Use /work to clock in.");
+      return;
+    }
+
+    if (await isOnBreak(db, session.id)) {
+      await ctx.reply("You're already on a break! Take your time, Tom's Bill Bot is patient. ☕");
+      return;
+    }
+
+    await startBreak(db, session.id);
+    await ctx.reply("<b>Break started! ☕</b>\n\nTom's Bill Bot is waiting for you. Use /resume when you're back.", { parse_mode: "HTML" });
+  });
+
+  // /resume - resume current session
+  bot.command("resume", async (ctx) => {
+    const userId = ctx.from?.id;
+    const chatId = ctx.chat?.id;
+    if (!userId || !chatId) return;
+
+    if (!await ensureGroupChat(ctx, "resume")) return;
+
+    const { db } = ctx;
+    const session = await getActiveSession(db, userId, chatId);
+    if (!session) {
+      await ctx.reply("Tom's Bill Bot doesn't see an active session! Use /work to clock in.");
+      return;
+    }
+
+    if (!await isOnBreak(db, session.id)) {
+      await ctx.reply("You're not on a break! Tom's Bill Bot sees you're already hard at work.");
+      return;
+    }
+
+    await resumeWork(db, session.id);
+    await ctx.reply("<b>Welcome back! 💼</b>\n\nTom's Bill Bot is back on the clock.", { parse_mode: "HTML" });
   });
 }

@@ -13,6 +13,7 @@ import { registerConfigHandlers } from "./handlers/config";
 import { registerWorkHandlers } from "./handlers/work";
 import { registerInvoiceHandler } from "./handlers/invoice";
 import { registerPaymentHandler } from "./handlers/payment";
+import { registerExpenseHandler } from "./handlers/expense";
 import { registerResetHandler } from "./handlers/reset";
 import { registerStatsHandler } from "./handlers/stats";
 import { registerExportHandler } from "./handlers/export";
@@ -93,6 +94,7 @@ export function createBot(
   registerWorkHandlers(bot);
   registerInvoiceHandler(bot);
   registerPaymentHandler(bot);
+  registerExpenseHandler(bot);
   registerResetHandler(bot);
   registerStatsHandler(bot);
   registerExportHandler(bot);

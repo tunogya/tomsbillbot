@@ -15,6 +15,11 @@ export function registerStatsHandler(bot: Bot<BotContext>): void {
 
     const { db, kv } = ctx;
 
+    // Parse tag if provided
+    const match = ctx.match?.toString().trim();
+    const tagMatch = match?.match(/#(\w+)/);
+    const tag = tagMatch ? tagMatch[1] : null;
+
     // Calculate timestamps
     const now = nowTs();
     const oneWeekAgo = now - WEEK_IN_SECONDS;
@@ -22,16 +27,17 @@ export function registerStatsHandler(bot: Bot<BotContext>): void {
 
     // Fetch stats in parallel
     const [weekStats, monthStats, summary, unitAmount] = await Promise.all([
-      getStats(db, userId, chatId, oneWeekAgo),
-      getStats(db, userId, chatId, oneMonthAgo),
+      getStats(db, userId, chatId, oneWeekAgo, tag),
+      getStats(db, userId, chatId, oneMonthAgo, tag),
       getInvoiceSummary(db, userId, chatId),
       getCachedUnitAmount(kv, db, userId, chatId)
     ]);
 
     const unbilledEarnings = computeAmount(weekStats.unbilled_minutes, unitAmount);
 
+    const tagTitle = tag ? ` [Project: #${tag}]` : "";
     const lines = [
-      "<b>Your Work Stats 📊</b>",
+      `<b>Your Work Stats${tagTitle} 📊</b>`,
       "",
       "<b>This Week:</b>",
       `• Total Hours: <code>${formatDuration(weekStats.total_minutes)} hrs</code>`,

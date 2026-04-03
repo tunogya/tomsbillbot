@@ -7,9 +7,9 @@
 
 ## P1: Core workflow improvements
 
-- [ ] **Project/tag support** (#9) — Tag work sessions: `/work #projectA`, `/work 2 #projectA`. Filter `/stats` and `/invoice` by project. New column `tag` on `work_sessions`.
-- [ ] **Break/pause support** (#10) — `/break` and `/resume` commands to pause/resume active sessions. Track break time, deduct from billable hours. Needs a `breaks` table or break tracking on `work_sessions`.
-- [ ] **Expense tracking** (#11) — `/expense 50 domain renewal` to log non-time expenses. Show as separate line items on invoices. New `expenses` table.
+- [x] **Project/tag support** (#9) — Tag work sessions: `/work #projectA`, `/work 2 #projectA`. Filter `/stats` and `/invoice` by project. New column `tag` on `work_sessions`.
+- [x] **Break/pause support** (#10) — `/break` and `/resume` commands to pause/resume active sessions. Track break time, deduct from billable hours. Needs a `breaks` table or break tracking on `work_sessions`.
+- [x] **Expense tracking** (#11) — `/expense 50 domain renewal` to log non-time expenses. Show as separate line items on invoices. New `expenses` table.
 
 ## P2: Team & reporting
 

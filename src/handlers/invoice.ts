@@ -21,6 +21,7 @@ import {
   parseMetadata,
   voidInvoice,
   recordPayment,
+  getUninvoicedExpenses,
   INVOICE_STATUS,
 } from "../services/db";
 import { getCachedCustomer, getCachedUnitAmount } from "../utils/cache";
@@ -41,6 +42,11 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
 
     const { db, kv } = ctx;
 
+    // Parse tag if provided
+    const match = ctx.match?.toString().trim();
+    const tagMatch = match?.match(/#(\w+)/);
+    const tag = tagMatch ? tagMatch[1] : null;
+
     // Get customer and unit price (cached) in parallel
     const [customer, unitAmount] = await Promise.all([
       getCachedCustomer(kv, db, userId),
@@ -56,14 +62,17 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
     }
 
     // Get uninvoiced completed sessions in this chat
-    const sessions = await getUninvoicedSessions(db, userId, chatId);
-    if (sessions.length === 0) {
-      await ctx.reply("Tom's Bill Bot couldn't find any uninvoiced work sessions here. All caught up!");
+    const sessions = await getUninvoicedSessions(db, userId, chatId, tag);
+    const expenses = await getUninvoicedExpenses(db, userId, chatId);
+
+    if (sessions.length === 0 && expenses.length === 0) {
+      const tagInfo = tag ? ` with project #${tag}` : "";
+      await ctx.reply(`Tom's Bill Bot couldn't find any uninvoiced work sessions or expenses here${tagInfo}. All caught up!`);
       return;
     }
 
     // Create invoice with line items
-    const invoice = await createInvoice(db, userId, chatId, sessions, unitAmount);
+    const invoice = await createInvoice(db, userId, chatId, sessions, unitAmount, expenses);
 
     // Get overall balance
     const summary = await getInvoiceSummary(db, userId, chatId);
@@ -72,10 +81,12 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
     // Calculate total hours for display
     const totalMinutes = sumDurations(sessions);
 
+    const tagTitle = tag ? ` [#${tag}]` : "";
     const lines = [
-      `<b>Tom's Bill Bot presents Invoice #${invoice.id}</b>`,
+      `<b>Tom's Bill Bot presents Invoice #${invoice.id}${tagTitle}</b>`,
       `• Status: <code>${escapeHtml(invoice.status.toUpperCase())}</code>`,
       `• Sessions: ${sessions.length}`,
+      `• Expenses: ${expenses.length}`,
       `• Total Hours: <code>${formatDuration(totalMinutes)}</code>`,
       `• Rate: <code>$${formatAmount(unitAmount)}/hr</code>`,
       `• Amount: <code>$${formatAmount(invoice.total)}</code>`,
@@ -236,10 +247,16 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
 
     const { db, kv } = ctx;
 
+    // Parse tag if provided
+    const match = ctx.match?.toString().trim();
+    const tagMatch = match?.match(/#(\w+)/);
+    const tag = tagMatch ? tagMatch[1] : null;
+
     // Get uninvoiced completed sessions in this chat
-    const sessions = await getUninvoicedSessions(db, userId, chatId);
-    if (sessions.length === 0) {
-      await ctx.reply("Tom's Bill Bot couldn't find any uninvoiced work sessions. You're all caught up!");
+    const sessions = await getUninvoicedSessions(db, userId, chatId, tag);
+    const expenses = await getUninvoicedExpenses(db, userId, chatId);
+    if (sessions.length === 0 && expenses.length === 0) {
+      await ctx.reply("Tom's Bill Bot couldn't find any uninvoiced work sessions or expenses. You're all caught up!");
       return;
     }
 
@@ -249,15 +266,20 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
 
     const totalMinutes = sumDurations(sessions);
 
+    const tagTitle = tag ? ` [#${tag}]` : "";
     const lines = [
-      "<b>Uninvoiced Work Sessions</b>",
+      `<b>Uninvoiced Items${tagTitle}</b>`,
       "",
       ...sessions.map((s, i) => {
         const date = formatTimestampLocal(s.start_time, tz).split(" ")[0]; // Just the YYYY-MM-DD
-        return `${i + 1}. ${date} - <code>${formatDuration(s.duration_minutes ?? 0)} hours</code>`;
+        const tagInfo = s.tag ? ` [${s.tag}]` : "";
+        return `${i + 1}. Session: ${date} - <code>${formatDuration(s.duration_minutes ?? 0)}h</code>${tagInfo}`;
+      }),
+      ...expenses.map((e, i) => {
+        return `${sessions.length + i + 1}. Expense: <code>$${formatAmount(e.amount)}</code> - ${e.description}`;
       }),
       "",
-      `<b>Total Unbilled:</b> <code>${formatDuration(totalMinutes)} hours</code>`,
+      `<b>Total Unbilled Hours:</b> <code>${formatDuration(totalMinutes)} hours</code>`,
       "",
       "<i>Ready to bill? Use /invoice</i>"
     ];
