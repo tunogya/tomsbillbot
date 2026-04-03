@@ -37,18 +37,18 @@ export function registerStatsHandler(bot: Bot<BotContext>): void {
 
     const tagTitle = tag ? ` [Project: #${tag}]` : "";
     const lines = [
-      `<b>Your Work Stats${tagTitle} 📊</b>`,
+      ctx.t("stats_title", { tag: tagTitle }),
       "",
-      "<b>This Week:</b>",
-      `• Total Hours: <code>${formatDuration(weekStats.total_minutes)} hrs</code>`,
+      ctx.t("stats_this_week"),
+      ctx.t("stats_hours", { hours: formatDuration(weekStats.total_minutes) }),
       "",
-      "<b>This Month:</b>",
-      `• Total Hours: <code>${formatDuration(monthStats.total_minutes)} hrs</code>`,
+      ctx.t("stats_this_month"),
+      ctx.t("stats_hours", { hours: formatDuration(monthStats.total_minutes) }),
       "",
-      "<b>Current Status:</b>",
-      `• Unbilled Hours: <code>${formatDuration(weekStats.unbilled_minutes)} hrs</code>`,
-      `• Estimated Value: <code>$${formatAmount(unbilledEarnings)}</code>`,
-      `• Outstanding Invoices: <code>$${formatAmount(Math.max(0, summary.total_invoiced - summary.total_paid))}</code>`
+      ctx.t("stats_current_status"),
+      ctx.t("stats_unbilled", { hours: formatDuration(weekStats.unbilled_minutes) }),
+      ctx.t("stats_estimated", { amount: formatAmount(unbilledEarnings) }),
+      ctx.t("stats_outstanding", { amount: formatAmount(Math.max(0, summary.total_invoiced - summary.total_paid)) })
     ];
 
     await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });

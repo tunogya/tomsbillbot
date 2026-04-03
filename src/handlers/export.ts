@@ -9,14 +9,14 @@ export function registerExportHandler(bot: Bot<BotContext>): void {
     if (!userId) return;
 
     if (ctx.chat?.type !== "private") {
-      await ctx.reply("Psst! Tom's Bill Bot says you should run <code>/export</code> in our private DMs so I can safely send you the files.", { parse_mode: "HTML" });
+      await ctx.reply(ctx.t("private_only"), { parse_mode: "HTML" });
       return;
     }
 
     const { db } = ctx;
 
     try {
-      await ctx.reply("Generating your export files... Please wait a moment.");
+      await ctx.reply(ctx.t("export_generating"));
 
       // Fetch all data in parallel
       const [invoices, sessions] = await Promise.all([
@@ -60,12 +60,12 @@ export function registerExportHandler(bot: Bot<BotContext>): void {
 
       await ctx.replyWithDocument(new InputFile(invoiceBuffer, "invoices_export.csv"));
       await ctx.replyWithDocument(new InputFile(sessionBuffer, "work_sessions_export.csv"));
-      
-      await ctx.reply("Export complete! Here are your invoices and work sessions records.");
+
+      await ctx.reply(ctx.t("export_success"));
 
     } catch (err) {
       console.error("Export error:", err);
-      await ctx.reply("Oops! Something went wrong while generating your export.");
+      await ctx.reply(ctx.t("export_failed"));
     }
   });
 }

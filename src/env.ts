@@ -14,9 +14,11 @@ export interface AppEnv {
  * environment bindings without module-level mutable state.
  */
 import type { Context } from "grammy";
+import type { TFunction } from "./i18n";
 
 export interface BotContext extends Context {
   db: D1Database;
   kv: KVNamespace;
   botToken: string;
+  t: TFunction;
 }

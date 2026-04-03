@@ -22,10 +22,7 @@ export function registerExpenseHandler(bot: Bot<BotContext>): void {
     const match = ctx.match?.toString().trim();
 
     if (!match) {
-      await ctx.reply(
-        "Tom's Bill Bot needs some details! Usage: <code>/expense &lt;amount&gt; &lt;description&gt;</code>\nExample: <code>/expense 50 domain renewal</code>",
-        { parse_mode: "HTML" }
-      );
+      await ctx.reply(ctx.t("expense_prompt"), { parse_mode: "HTML" });
       return;
     }
 
@@ -35,12 +32,12 @@ export function registerExpenseHandler(bot: Bot<BotContext>): void {
 
     const amountDollars = parseFloat(amountStr);
     if (isNaN(amountDollars) || amountDollars <= 0) {
-      await ctx.reply("Oops! Please provide a valid positive number for the amount.");
+      await ctx.reply(ctx.t("settings_invalid_number"));
       return;
     }
 
     if (!description) {
-      await ctx.reply("Tom's Bill Bot needs a description for the expense! What was it for?");
+      await ctx.reply(ctx.t("expense_no_desc"));
       return;
     }
 
@@ -50,9 +47,10 @@ export function registerExpenseHandler(bot: Bot<BotContext>): void {
       await upsertCustomer(db, userId, ctx.from?.first_name);
       await addExpense(db, userId, chatId, amountCents, description);
       await ctx.reply(
-        "<b>Expense logged! 💸</b>\n\n" +
-        `Amount: <code>$${escapeHtml(formatAmount(amountCents))}</code>\n` +
-        `Description: <code>${escapeHtml(description)}</code>`,
+        ctx.t("expense_logged", {
+          amount: formatAmount(amountCents),
+          description: escapeHtml(description),
+        }),
         { parse_mode: "HTML" }
       );
     } catch (err) {

@@ -2,10 +2,6 @@
  * Work session handlers (Group commands).
  * /work - start a session
  * /done - end a session
- *
- * Rules:
- * - One active session per customer per group
- * - Prevents duplicates via DB query check + UNIQUE partial index
  */
 
 import { Bot, InlineKeyboard } from "grammy";
@@ -24,8 +20,8 @@ import {
   isOnBreak,
   SESSION_STATUS,
 } from "../services/db";
-import { nowTs, durationMinutes, formatDuration, formatTimestamp, formatTimestampLocal, roundToGranularity } from "../utils/time";
-import { getCachedGranularity, invalidateCustomerCache } from "../utils/cache";
+import { nowTs, durationMinutes, formatDuration, formatTimestampLocal, roundToGranularity } from "../utils/time";
+import { getCachedGranularity } from "../utils/cache";
 import { escapeHtml } from "../utils/telegram";
 import type { BotContext } from "../env";
 
@@ -44,10 +40,9 @@ export function registerWorkHandlers(bot: Bot<BotContext>): void {
     const { db, kv } = ctx;
     const userName = ctx.from?.first_name ?? "User";
 
-    // --- NEW: Handle /work <amount> [#tag] ---
+    // --- Handle /work <amount> [#tag] ---
     const match = ctx.match?.toString().trim();
     if (match) {
-      // Parse: /work 1.5 #tag OR /work #tag
       const tagMatch = match.match(/#(\w+)/);
       const tag = tagMatch ? tagMatch[1] : null;
       const amountStr = match.replace(/#\w+/, "").trim();
@@ -55,17 +50,11 @@ export function registerWorkHandlers(bot: Bot<BotContext>): void {
       if (amountStr) {
         const amount = parseFloat(amountStr);
         if (isNaN(amount) || amount <= 0) {
-          await ctx.reply(
-            "Tom's Bill Bot didn't catch that. Please use a positive number for the hours, like <code>/work 1.5</code>.",
-            { parse_mode: "HTML" }
-          );
+          await ctx.reply(ctx.t("work_invalid_hours"), { parse_mode: "HTML" });
           return;
         }
 
-        // Ensure customer exists (cache Telegram display name)
         await upsertCustomer(db, userId, userName);
-
-        // Calculate final duration with user-configured granularity
         const granularity = await getCachedGranularity(kv, db, userId, chatId);
         const rawMins = Math.round(amount * 60);
         const duration = roundToGranularity(rawMins, granularity);
@@ -74,8 +63,10 @@ export function registerWorkHandlers(bot: Bot<BotContext>): void {
           await logManualWorkSession(db, userId, chatId, duration, tag);
           const tagInfo = tag ? ` [Project: #${tag}]` : "";
           await ctx.reply(
-            "<b>Manual work logged! Tom's Bill Bot is impressed!</b>\n\n" +
-            `Duration: <code>${escapeHtml(formatDuration(duration))} hours</code>${tagInfo}`,
+            ctx.t("work_logged", {
+              duration: formatDuration(duration),
+              tag: tagInfo
+            }),
             { parse_mode: "HTML" }
           );
           return;
@@ -84,15 +75,16 @@ export function registerWorkHandlers(bot: Bot<BotContext>): void {
           throw err;
         }
       } else if (tag) {
-        // Just /work #tag -> Start timer with tag
+        // Start timer with tag
         const existing = await getActiveSession(db, userId, chatId);
         if (existing) {
           const customer = await getCustomer(db, userId);
           const metadata = customer ? parseMetadata(customer.metadata) : {};
           const tz = metadata.timezone;
-
           await ctx.reply(
-            `Tom's Bill Bot sees you're already grinding! 💼\nYou have an active session from <code>${escapeHtml(formatTimestampLocal(existing.start_time, tz))}</code>.\nUse /done to clock out first.`,
+            ctx.t("work_already_active", {
+              start_time: escapeHtml(formatTimestampLocal(existing.start_time, tz))
+            }),
             { parse_mode: "HTML" }
           );
           return;
@@ -101,8 +93,7 @@ export function registerWorkHandlers(bot: Bot<BotContext>): void {
         await upsertCustomer(db, userId, userName);
         await startWorkSession(db, userId, chatId, tag);
         await ctx.reply(
-          `<b>Work session started for #${tag}! Tom's Bill Bot is on the clock!</b>\n\n` +
-          "Don't forget to use /done when you're finished.",
+          ctx.t("work_started", { tag: ` for #${tag}` }),
           { parse_mode: "HTML" }
         );
         return;
@@ -110,36 +101,31 @@ export function registerWorkHandlers(bot: Bot<BotContext>): void {
     }
 
     // --- Original behavior: Start Timer ---
-    // Check for existing active session
     const existing = await getActiveSession(db, userId, chatId);
     if (existing) {
       const customer = await getCustomer(db, userId);
       const metadata = customer ? parseMetadata(customer.metadata) : {};
       const tz = metadata.timezone;
-
       await ctx.reply(
-        `Tom's Bill Bot sees you're already grinding! 💼\nYou have an active session from <code>${escapeHtml(formatTimestampLocal(existing.start_time, tz))}</code>.\nUse /done to clock out first.`,
+        ctx.t("work_already_active", {
+          start_time: escapeHtml(formatTimestampLocal(existing.start_time, tz))
+        }),
         { parse_mode: "HTML" }
       );
       return;
     }
 
     try {
-      // Ensure customer exists (cache Telegram display name)
       await upsertCustomer(db, userId, userName);
-      const session = await startWorkSession(db, userId, chatId);
-
+      await startWorkSession(db, userId, chatId);
       await ctx.reply(
-        "<b>Work session started! Tom's Bill Bot is on the clock!</b>\n\n" +
-        "Don't forget to use /done when you're finished.",
+        ctx.t("work_started", { tag: "" }),
         { parse_mode: "HTML" }
       );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("UNIQUE constraint failed") || msg.includes("SQLITE_CONSTRAINT")) {
-        await ctx.reply(
-          "Tom's Bill Bot says: You already have an active session. Use /done to clock out first."
-        );
+        await ctx.reply(ctx.t("work_already_active", { start_time: "..." }));
       } else {
         throw err;
       }
@@ -151,17 +137,12 @@ export function registerWorkHandlers(bot: Bot<BotContext>): void {
     const userId = ctx.from?.id;
     const chatId = ctx.chat?.id;
     if (!userId || !chatId) return;
-
     if (!await ensureGroupChat(ctx, "discard")) return;
 
     const { db } = ctx;
-
     const existing = await getActiveSession(db, userId, chatId);
     if (!existing) {
-      await ctx.reply(
-        "Tom's Bill Bot couldn't find an active work session to cancel!\n(Manual work logs via <code>/work &lt;hours&gt;</code> cannot be cancelled this way.)",
-        { parse_mode: "HTML" }
-      );
+      await ctx.reply(ctx.t("work_no_active"), { parse_mode: "HTML" });
       return;
     }
 
@@ -169,53 +150,23 @@ export function registerWorkHandlers(bot: Bot<BotContext>): void {
       .text("🗑️ Discard Timer", `confirm_discard:${userId}`)
       .text("❌ Cancel", `cancel_discard:${userId}`);
 
-    await ctx.reply(
-      "<b>⚠️ DISCARD ACTIVE TIMER?</b>\n\n" +
-      "This will permanently delete your currently active work session timer.",
-      { parse_mode: "HTML", reply_markup: keyboard }
-    );
+    await ctx.reply("<b>⚠️ DISCARD ACTIVE TIMER?</b>", { parse_mode: "HTML", reply_markup: keyboard });
   });
 
   bot.callbackQuery(/^confirm_discard:(\d+)$/, async (ctx) => {
     const userId = ctx.from?.id;
     const targetUserId = parseInt(ctx.match[1], 10);
-    const chatId = ctx.chat?.id;
-    if (!userId || !chatId) return;
-
-    if (userId !== targetUserId) {
-      await ctx.answerCallbackQuery({
-        text: "This confirmation is for someone else! ⛔",
-        show_alert: true
-      });
+    if (!userId || userId !== targetUserId) {
+      await ctx.answerCallbackQuery({ text: ctx.t("unauthorized"), show_alert: true });
       return;
     }
-
     const { db } = ctx;
-    const deleted = await deleteActiveSession(db, userId, chatId);
-    if (deleted) {
-      await ctx.editMessageText(
-        "<b>Work session cancelled! Tom's Bill Bot has wiped the slate clean. 🧹</b>",
-        { parse_mode: "HTML" }
-      );
-    } else {
-      await ctx.editMessageText(
-        "Tom's Bill Bot couldn't find that active session anymore. It might have already been processed.",
-        { parse_mode: "HTML" }
-      );
-    }
+    await deleteActiveSession(db, userId, ctx.chat!.id);
+    await ctx.editMessageText("<b>Work session cancelled! 🧹</b>", { parse_mode: "HTML" });
     await ctx.answerCallbackQuery();
   });
 
   bot.callbackQuery(/^cancel_discard:(\d+)$/, async (ctx) => {
-    const userId = ctx.from?.id;
-    const targetUserId = parseInt(ctx.match[1], 10);
-    if (userId !== targetUserId) {
-      await ctx.answerCallbackQuery({
-        text: "This confirmation is for someone else! ⛔",
-        show_alert: true
-      });
-      return;
-    }
     await ctx.editMessageText("Discard cancelled. Your timer is still running! ⏱️");
     await ctx.answerCallbackQuery();
   });
@@ -225,95 +176,58 @@ export function registerWorkHandlers(bot: Bot<BotContext>): void {
     const userId = ctx.from?.id;
     const chatId = ctx.chat?.id;
     if (!userId || !chatId) return;
-
     if (!await ensureGroupChat(ctx, "done")) return;
 
     const { db, kv } = ctx;
-
-    // Find active session
     const session = await getActiveSession(db, userId, chatId);
     if (!session) {
-      await ctx.reply("Tom's Bill Bot couldn't find an active work session! Use /work to clock in.");
+      await ctx.reply(ctx.t("work_no_active"));
       return;
     }
 
-    // End session with user-configured granularity
     const endTime = nowTs();
     const granularity = await getCachedGranularity(kv, db, userId, chatId);
     const duration = durationMinutes(session.start_time, endTime, granularity);
     await completeWorkSession(db, session.id, endTime, duration);
 
     await ctx.reply(
-      "<b>Work session ended! Tom's Bill Bot says great job!</b>\n\n" +
-      `Duration: <code>${escapeHtml(formatDuration(duration))} hours</code>`,
+      ctx.t("work_ended", { duration: formatDuration(duration) }),
       { parse_mode: "HTML" }
     );
   });
-
 
   // /undo - revert the last uninvoiced work session
   bot.command("undo", async (ctx) => {
     const userId = ctx.from?.id;
     const chatId = ctx.chat?.id;
     if (!userId || !chatId) return;
-
     if (!await ensureGroupChat(ctx, "undo")) return;
 
     const keyboard = new InlineKeyboard()
       .text("⏪ Confirm Undo", `confirm_undo:${userId}`)
       .text("❌ Cancel", `cancel_undo:${userId}`);
 
-    await ctx.reply(
-      "<b>⚠️ UNDO LAST SESSION?</b>\n\n" +
-      "This will delete your most recent work session or timer if it hasn't been invoiced yet.",
-      { parse_mode: "HTML", reply_markup: keyboard }
-    );
+    await ctx.reply("<b>⚠️ UNDO LAST SESSION?</b>", { parse_mode: "HTML", reply_markup: keyboard });
   });
 
   bot.callbackQuery(/^confirm_undo:(\d+)$/, async (ctx) => {
     const userId = ctx.from?.id;
     const targetUserId = parseInt(ctx.match[1], 10);
-    const chatId = ctx.chat?.id;
-    if (!userId || !chatId) return;
-
-    if (userId !== targetUserId) {
-      await ctx.answerCallbackQuery({
-        text: "This confirmation is for someone else! ⛔",
-        show_alert: true
-      });
+    if (!userId || userId !== targetUserId) {
+      await ctx.answerCallbackQuery({ text: ctx.t("unauthorized"), show_alert: true });
       return;
     }
-
-    const { db } = ctx;
-    const reverted = await undoLastWorkSession(db, userId, chatId);
+    const reverted = await undoLastWorkSession(ctx.db, userId, ctx.chat!.id);
     if (reverted) {
-      let msg = "";
-      if (reverted.duration_minutes !== null) {
-        msg = `<b>Undo successful! ⏪</b>\n\nTom's Bill Bot has deleted your last completed work session (<code>${escapeHtml(formatDuration(reverted.duration_minutes))} hours</code>).`;
-      } else {
-        msg = "<b>Undo successful! ⏪</b>\n\nTom's Bill Bot has deleted your currently active timer.";
-      }
-      await ctx.editMessageText(msg, { parse_mode: "HTML" });
+      await ctx.editMessageText("<b>Undo successful! ⏪</b>", { parse_mode: "HTML" });
     } else {
-      await ctx.editMessageText(
-        "Tom's Bill Bot couldn't find any recent uninvoiced work sessions to undo.",
-        { parse_mode: "HTML" }
-      );
+      await ctx.editMessageText("Nothing to undo.", { parse_mode: "HTML" });
     }
     await ctx.answerCallbackQuery();
   });
 
   bot.callbackQuery(/^cancel_undo:(\d+)$/, async (ctx) => {
-    const userId = ctx.from?.id;
-    const targetUserId = parseInt(ctx.match[1], 10);
-    if (userId !== targetUserId) {
-      await ctx.answerCallbackQuery({
-        text: "This confirmation is for someone else! ⛔",
-        show_alert: true
-      });
-      return;
-    }
-    await ctx.editMessageText("Undo cancelled. No data was deleted.");
+    await ctx.editMessageText("Undo cancelled.");
     await ctx.answerCallbackQuery();
   });
 
@@ -322,23 +236,19 @@ export function registerWorkHandlers(bot: Bot<BotContext>): void {
     const userId = ctx.from?.id;
     const chatId = ctx.chat?.id;
     if (!userId || !chatId) return;
-
     if (!await ensureGroupChat(ctx, "break")) return;
 
-    const { db } = ctx;
-    const session = await getActiveSession(db, userId, chatId);
+    const session = await getActiveSession(ctx.db, userId, chatId);
     if (!session) {
-      await ctx.reply("Tom's Bill Bot doesn't see an active session to pause! Use /work to clock in.");
+      await ctx.reply(ctx.t("work_no_active"));
       return;
     }
-
-    if (await isOnBreak(db, session.id)) {
-      await ctx.reply("You're already on a break! Take your time, Tom's Bill Bot is patient. ☕");
+    if (await isOnBreak(ctx.db, session.id)) {
+      await ctx.reply(ctx.t("break_already"));
       return;
     }
-
-    await startBreak(db, session.id);
-    await ctx.reply("<b>Break started! ☕</b>\n\nTom's Bill Bot is waiting for you. Use /resume when you're back.", { parse_mode: "HTML" });
+    await startBreak(ctx.db, session.id);
+    await ctx.reply(ctx.t("break_started"), { parse_mode: "HTML" });
   });
 
   // /resume - resume current session
@@ -346,22 +256,14 @@ export function registerWorkHandlers(bot: Bot<BotContext>): void {
     const userId = ctx.from?.id;
     const chatId = ctx.chat?.id;
     if (!userId || !chatId) return;
-
     if (!await ensureGroupChat(ctx, "resume")) return;
 
-    const { db } = ctx;
-    const session = await getActiveSession(db, userId, chatId);
-    if (!session) {
-      await ctx.reply("Tom's Bill Bot doesn't see an active session! Use /work to clock in.");
+    const session = await getActiveSession(ctx.db, userId, chatId);
+    if (!session || !await isOnBreak(ctx.db, session.id)) {
+      await ctx.reply(ctx.t("break_not_on"));
       return;
     }
-
-    if (!await isOnBreak(db, session.id)) {
-      await ctx.reply("You're not on a break! Tom's Bill Bot sees you're already hard at work.");
-      return;
-    }
-
-    await resumeWork(db, session.id);
-    await ctx.reply("<b>Welcome back! 💼</b>\n\nTom's Bill Bot is back on the clock.", { parse_mode: "HTML" });
+    await resumeWork(ctx.db, session.id);
+    await ctx.reply(ctx.t("break_resume"), { parse_mode: "HTML" });
   });
 }

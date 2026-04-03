@@ -26,28 +26,35 @@ export function registerTeamHandler(bot: Bot<BotContext>): void {
     ]);
 
     if (activeSessions.length === 0 && summaries.length === 0) {
-      await ctx.reply("Tom's Bill Bot doesn't see any team activity in this group yet.");
+      await ctx.reply(ctx.t("team_empty"));
       return;
     }
 
-    const lines = ["<b>Team Dashboard 👥</b>", ""];
+    const lines = [ctx.t("team_title"), ""];
 
     if (activeSessions.length > 0) {
-      lines.push("<b>⚡ Currently Working:</b>");
+      lines.push(ctx.t("team_working"));
       const now = nowTs();
       for (const s of activeSessions) {
         const elapsedMins = Math.floor((now - s.start_time) / 60);
-        lines.push(`• ${escapeHtml(s.customer_name)}: <code>${formatDuration(elapsedMins)}h</code> so far`);
+        lines.push(ctx.t("team_member_working", {
+          name: escapeHtml(s.customer_name),
+          duration: formatDuration(elapsedMins)
+        }));
       }
       lines.push("");
     }
 
     if (summaries.length > 0) {
-      lines.push("<b>📊 Member Summaries:</b>");
+      lines.push(ctx.t("team_summaries"));
       for (const s of summaries) {
         const unbilledStr = s.unbilled_minutes > 0 ? `${formatDuration(s.unbilled_minutes)}h unbilled` : "All billed";
         const balanceStr = s.outstanding_cents > 0 ? `$${formatAmount(s.outstanding_cents)} due` : "Paid up";
-        lines.push(`• <b>${escapeHtml(s.customer_name)}</b>: ${unbilledStr}, ${balanceStr}`);
+        lines.push(ctx.t("team_member_summary", {
+          name: escapeHtml(s.customer_name),
+          unbilled: unbilledStr,
+          balance: balanceStr
+        }));
       }
     }
 

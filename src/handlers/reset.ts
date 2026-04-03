@@ -15,23 +15,20 @@ export function registerResetHandler(bot: Bot<BotContext>): void {
     try {
       const member = await ctx.api.getChatMember(ctx.chat.id, userId);
       if (member.status !== "creator" && member.status !== "administrator") {
-        await ctx.reply("Only group admins can reset billing data.");
+        await ctx.reply(ctx.t("reset_admin_only"));
         return;
       }
     } catch {
-      await ctx.reply("Unable to verify admin status. Please make sure the bot has permission to see group members.");
+      await ctx.reply(ctx.t("reset_verify_failed"));
       return;
     }
 
     const keyboard = new InlineKeyboard()
-      .text("⚠️ Yes, Reset Everything", "confirm_reset")
-      .text("❌ Cancel", "cancel_reset");
+      .text(ctx.t("reset_confirm_btn"), "confirm_reset")
+      .text(ctx.t("cancel"), "cancel_reset");
 
     await ctx.reply(
-      "<b>⚠️ CRITICAL ACTION: RESET DATA</b>\n\n" +
-      "This will permanently delete all work sessions, invoices, and payment history for this group. " +
-      "This action <b>CANNOT</b> be undone.\n\n" +
-      "Are you absolutely sure?",
+      `${ctx.t("reset_confirm_title")}\n\n${ctx.t("reset_confirm_body")}`,
       { parse_mode: "HTML", reply_markup: keyboard }
     );
   });
@@ -46,7 +43,7 @@ export function registerResetHandler(bot: Bot<BotContext>): void {
       const member = await ctx.api.getChatMember(chatId, userId);
       if (member.status !== "creator" && member.status !== "administrator") {
         await ctx.answerCallbackQuery({
-          text: "Only group admins can confirm reset.",
+          text: ctx.t("reset_admin_only"),
           show_alert: true
         });
         return;
@@ -63,23 +60,17 @@ export function registerResetHandler(bot: Bot<BotContext>): void {
 
     try {
       await resetGroupData(db, chatId);
-      await ctx.editMessageText(
-        "✅ <b>Poof!</b> Tom's Bill Bot has permanently reset all historical bills, work sessions, and payments for this group.",
-        { parse_mode: "HTML" }
-      );
+      await ctx.editMessageText(ctx.t("reset_success"), { parse_mode: "HTML" });
       await ctx.answerCallbackQuery();
     } catch (err) {
       console.error("Failed to reset group data:", err);
-      await ctx.editMessageText(
-        "❌ <b>Yikes!</b> Tom's Bill Bot encountered an error while resetting data.",
-        { parse_mode: "HTML" }
-      );
+      await ctx.editMessageText(ctx.t("error_generic"), { parse_mode: "HTML" });
       await ctx.answerCallbackQuery();
     }
   });
 
   bot.callbackQuery("cancel_reset", async (ctx) => {
-    await ctx.editMessageText("Whew! Reset operation cancelled. No data was deleted.");
+    await ctx.editMessageText(ctx.t("reset_cancelled"));
     await ctx.answerCallbackQuery();
   });
 }

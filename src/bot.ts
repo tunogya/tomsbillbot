@@ -22,6 +22,8 @@ import { registerHistoryHandler } from "./handlers/history";
 import { registerTeamHandler } from "./handlers/team";
 import { registerChatCleanupHandler } from "./handlers/chatCleanup";
 import { registerHelpHandler } from "./handlers/help";
+import { getT } from "./i18n";
+import { getCustomer, parseMetadata } from "./services/db";
 import { checkRateLimit } from "./utils/ratelimit";
 import { isCommandText } from "./utils/telegram";
 import type { AppEnv, BotContext } from "./env";
@@ -50,6 +52,30 @@ export function createBot(
     ctx.db = env.DB;
     ctx.kv = env.KV;
     ctx.botToken = env.BOT_TOKEN;
+
+    // --- i18n Middleware ---
+    const userId = ctx.from?.id;
+    let lang = ctx.from?.language_code || "en";
+
+    if (userId) {
+      // Check cache first for performance
+      const cacheKey = `customer:lang:${userId}`;
+      const cachedLang = await ctx.kv.get(cacheKey);
+      if (cachedLang) {
+        lang = cachedLang;
+      } else {
+        const customer = await getCustomer(ctx.db, userId);
+        if (customer) {
+          const metadata = parseMetadata(customer.metadata);
+          if (metadata.language) {
+            lang = metadata.language;
+            await ctx.kv.put(cacheKey, lang, { expirationTtl: 3600 }); // cache for 1h
+          }
+        }
+      }
+    }
+
+    ctx.t = getT(lang);
     await next();
   });
 

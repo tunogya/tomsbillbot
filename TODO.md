@@ -18,7 +18,7 @@
 
 ## P3: Polish
 
-- [ ] **i18n / Localization** (#14) — Multi-language support (zh, ja, es, etc.). Detect from Telegram `language_code` or manual override in `/settings`. Externalize all bot strings.
+- [x] **i18n / Localization** (#14) — Multi-language support (zh, ja, es, etc.). Detect from Telegram `language_code` or manual override in `/settings`. Externalize all bot strings.
 
 ## Out of scope (for now)
 
