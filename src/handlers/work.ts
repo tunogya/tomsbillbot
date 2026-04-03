@@ -17,10 +17,12 @@ import {
   logManualWorkSession,
   deleteActiveSession,
   undoLastWorkSession,
+  getCustomer,
+  parseMetadata,
   SESSION_STATUS,
 } from "../services/db";
-import { nowTs, durationMinutes, formatDuration, formatTimestamp, roundToGranularity } from "../utils/time";
-import { getCachedGranularity } from "../utils/cache";
+import { nowTs, durationMinutes, formatDuration, formatTimestamp, formatTimestampLocal, roundToGranularity } from "../utils/time";
+import { getCachedGranularity, invalidateCustomerCache } from "../utils/cache";
 import { escapeHtml } from "../utils/telegram";
 import type { BotContext } from "../env";
 
@@ -77,8 +79,12 @@ export function registerWorkHandlers(bot: Bot<BotContext>): void {
     // Check for existing active session
     const existing = await getActiveSession(db, userId, chatId);
     if (existing) {
+      const customer = await getCustomer(db, userId);
+      const metadata = customer ? parseMetadata(customer.metadata) : {};
+      const tz = metadata.timezone;
+
       await ctx.reply(
-        `Tom's Bill Bot sees you're already grinding! 💼\nYou have an active session from <code>${escapeHtml(formatTimestamp(existing.start_time))}</code>.\nUse /done to clock out first.`,
+        `Tom's Bill Bot sees you're already grinding! 💼\nYou have an active session from <code>${escapeHtml(formatTimestampLocal(existing.start_time, tz))}</code>.\nUse /done to clock out first.`,
         { parse_mode: "HTML" }
       );
       return;

@@ -2,8 +2,8 @@
 
 ## P0: Quick wins (small scope, high value)
 
-- [ ] **Timezone support** (#7) — Allow users to set IANA timezone in `/settings`, display all timestamps in local time. Store in customer metadata.
-- [ ] **`/history` command** (#8) — Unified activity timeline (sessions + invoices + payments) in one view, sorted by time desc. Group command.
+- [x] **Timezone support** (#7) — Allow users to set IANA timezone in `/settings`, display all timestamps in local time. Store in customer metadata.
+- [x] **`/history` command** (#8) — Unified activity timeline (sessions + invoices + payments) in one view, sorted by time desc. Group command.
 
 ## P1: Core workflow improvements
 

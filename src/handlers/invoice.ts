@@ -24,7 +24,7 @@ import {
   INVOICE_STATUS,
 } from "../services/db";
 import { getCachedCustomer, getCachedUnitAmount } from "../utils/cache";
-import { formatAmount, formatDuration, formatTimestamp, sumDurations } from "../utils/time";
+import { formatAmount, formatDuration, formatTimestampLocal, sumDurations } from "../utils/time";
 import { escapeHtml } from "../utils/telegram";
 import type { BotContext } from "../env";
 
@@ -106,7 +106,7 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
 
     if (!await ensureGroupChat(ctx, "invoices")) return;
 
-    const { db } = ctx;
+    const { db, kv } = ctx;
     const invoices = await getRecentInvoices(db, userId, chatId, 5);
 
     if (invoices.length === 0) {
@@ -114,11 +114,15 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
       return;
     }
 
+    const customer = await getCachedCustomer(kv, db, userId);
+    const metadata = customer ? parseMetadata(customer.metadata) : {};
+    const tz = metadata.timezone;
+
     const lines = [
       "<b>Your Recent Invoices</b>",
       "",
       ...invoices.map((inv) => {
-        const date = formatTimestamp(inv.created).split(" ")[0]; // Just the YYYY-MM-DD
+        const date = formatTimestampLocal(inv.created, tz).split(" ")[0]; // Just the YYYY-MM-DD
         const status = inv.status.toUpperCase();
         const statusEmoji = status === "PAID" ? "✅" : "⏳";
         return `• #${inv.id} (${date}) - <code>${formatAmount(inv.total)}</code> ${statusEmoji} <code>${escapeHtml(status)}</code>`;
@@ -230,7 +234,7 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
 
     if (!await ensureGroupChat(ctx, "sessions")) return;
 
-    const { db } = ctx;
+    const { db, kv } = ctx;
 
     // Get uninvoiced completed sessions in this chat
     const sessions = await getUninvoicedSessions(db, userId, chatId);
@@ -239,13 +243,17 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
       return;
     }
 
+    const customer = await getCachedCustomer(kv, db, userId);
+    const metadata = customer ? parseMetadata(customer.metadata) : {};
+    const tz = metadata.timezone;
+
     const totalMinutes = sumDurations(sessions);
 
     const lines = [
       "<b>Uninvoiced Work Sessions</b>",
       "",
       ...sessions.map((s, i) => {
-        const date = formatTimestamp(s.start_time).split(" ")[0]; // Just the YYYY-MM-DD
+        const date = formatTimestampLocal(s.start_time, tz).split(" ")[0]; // Just the YYYY-MM-DD
         return `${i + 1}. ${date} - <code>${formatDuration(s.duration_minutes ?? 0)} hours</code>`;
       }),
       "",

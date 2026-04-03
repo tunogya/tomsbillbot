@@ -19,7 +19,7 @@ import {
   updatePriceMetadata,
 } from "../services/db";
 import { invalidateCustomerCache, invalidateRateCache, invalidateGranularityCache } from "../utils/cache";
-import { formatAmount } from "../utils/time";
+import { formatAmount, isValidTimezone } from "../utils/time";
 import { escapeHtml } from "../utils/telegram";
 import type { BotContext } from "../env";
 
@@ -45,6 +45,7 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
     const address = customer?.payment_address || "Not set";
     const metadata = customer ? parseMetadata(customer.metadata) : {};
     const remark = metadata.remark || "Not set";
+    const timezone = metadata.timezone || "UTC";
 
     const scope = ctx.chat.type === "private" ? "Default" : "Group";
     const rateStr = unitAmount > 0 ? `${formatAmount(unitAmount)}/hr` : "Not set";
@@ -56,6 +57,7 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
       "",
       `<b>Hourly Rate:</b> ${escapeHtml(rateStr)}`,
       `<b>Billing Granularity:</b> ${granularity} min`,
+      `<b>Timezone:</b> <code>${escapeHtml(timezone)}</code>`,
     ];
 
     if (ctx.chat.type === "private") {
@@ -66,13 +68,14 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
     }
 
     const keyboard = new InlineKeyboard()
-      .text("✏️ Edit Rate", "edit_rate")
-      .text("✏️ Edit Granularity", "edit_granularity").row();
+      .text("✏️ Rate", "edit_rate")
+      .text("✏️ Granularity", "edit_granularity")
+      .text("✏️ Timezone", "edit_timezone").row();
 
     if (ctx.chat.type === "private") {
       keyboard
-        .text("✏️ Edit Address", "edit_address")
-        .text("✏️ Edit Remark", "edit_remark");
+        .text("✏️ Address", "edit_address")
+        .text("✏️ Remark", "edit_remark");
     }
 
     await ctx.reply(lines.join("\n"), { parse_mode: "HTML", reply_markup: keyboard });
@@ -90,6 +93,14 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
   bot.callbackQuery(/^edit_granularity$/, async (ctx) => {
     await ctx.answerCallbackQuery();
     await ctx.reply("Please reply to this message with your new billing granularity in minutes (e.g., <code>30</code> for half-hour):", {
+      parse_mode: "HTML",
+      reply_markup: { force_reply: true, selective: true }
+    });
+  });
+
+  bot.callbackQuery(/^edit_timezone$/, async (ctx) => {
+    await ctx.answerCallbackQuery();
+    await ctx.reply("Please reply to this message with your IANA timezone (e.g., <code>Asia/Shanghai</code>, <code>UTC</code>, <code>America/New_York</code>):", {
       parse_mode: "HTML",
       reply_markup: { force_reply: true, selective: true }
     });
@@ -170,6 +181,21 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
       await updateCustomerMetadata(db, userId, metadata);
       await invalidateCustomerCache(kv, userId);
       await ctx.reply(`✅ Invoice remark updated to:\n<code>${escapeHtml(input)}</code>`, {
+        parse_mode: "HTML"
+      });
+
+    } else if (promptText.includes("IANA timezone")) {
+      if (!isValidTimezone(input)) {
+        await ctx.reply("Oops! That doesn't look like a valid IANA timezone (e.g., <code>Asia/Shanghai</code>). Please try again.", { parse_mode: "HTML" });
+        return;
+      }
+      await upsertCustomer(db, userId, ctx.from?.first_name);
+      const customer = await getCustomer(db, userId);
+      const metadata = customer ? parseMetadata(customer.metadata) : {};
+      metadata.timezone = input;
+      await updateCustomerMetadata(db, userId, metadata);
+      await invalidateCustomerCache(kv, userId);
+      await ctx.reply(`✅ Timezone updated to: <code>${escapeHtml(input)}</code>`, {
         parse_mode: "HTML"
       });
 

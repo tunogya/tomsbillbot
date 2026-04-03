@@ -637,6 +637,25 @@ export async function getRecentInvoices(
   return result.results ?? [];
 }
 
+/** Get recent work sessions for a customer in a chat (limit 10). */
+export async function getRecentWorkSessions(
+  db: D1Database,
+  customerId: number,
+  chatId: number,
+  limit: number = 10
+): Promise<WorkSession[]> {
+  const result = await db
+    .prepare(
+      `SELECT * FROM work_sessions
+       WHERE customer_id = ? AND chat_id = ?
+       ORDER BY created DESC
+       LIMIT ?`
+    )
+    .bind(customerId, chatId, limit)
+    .all<WorkSession>();
+  return result.results ?? [];
+}
+
 /** Get a single invoice by ID. */
 export async function getInvoice(
   db: D1Database,
@@ -818,6 +837,25 @@ export async function recordPayment(
   }
 
   return { payment, invoice: updatedInvoice };
+}
+
+/** Get recent payments for a customer in a chat (limit 10). */
+export async function getRecentPayments(
+  db: D1Database,
+  customerId: number,
+  chatId: number,
+  limit: number = 10
+): Promise<Payment[]> {
+  const result = await db
+    .prepare(
+      `SELECT * FROM payments
+       WHERE customer_id = ? AND chat_id = ?
+       ORDER BY created DESC
+       LIMIT ?`
+    )
+    .bind(customerId, chatId, limit)
+    .all<Payment>();
+  return result.results ?? [];
 }
 
 // ─── Reset Operations ────────────────────────────────────────────

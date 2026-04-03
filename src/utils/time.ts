@@ -62,3 +62,40 @@ export function formatDuration(minutes: number): string {
 export function formatTimestamp(ts: number): string {
   return new Date(ts * 1000).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC");
 }
+
+/**
+ * Formats a Unix timestamp using a specific IANA timezone.
+ * Falls back to UTC if timezone is invalid.
+ */
+export function formatTimestampLocal(ts: number, tz?: string): string {
+  if (!tz) return formatTimestamp(ts);
+  try {
+    const date = new Date(ts * 1000);
+    const options: Intl.DateTimeFormatOptions = {
+      timeZone: tz,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    };
+    const formatter = new Intl.DateTimeFormat("en-GB", options);
+    const parts = formatter.formatToParts(date);
+    const map = new Map(parts.map(p => [p.type, p.value]));
+    return `${map.get("year")}-${map.get("month")}-${map.get("day")} ${map.get("hour")}:${map.get("minute")}:${map.get("second")} ${tz}`;
+  } catch {
+    return formatTimestamp(ts);
+  }
+}
+
+/** Validates if a string is a valid IANA timezone. */
+export function isValidTimezone(tz: string): boolean {
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
