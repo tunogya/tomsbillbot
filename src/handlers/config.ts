@@ -20,6 +20,7 @@ import {
 } from "../services/db";
 import { invalidateCustomerCache, invalidateRateCache, invalidateGranularityCache } from "../utils/cache";
 import { formatAmount } from "../utils/time";
+import { escapeHtml } from "../utils/telegram";
 import type { BotContext } from "../env";
 
 export function registerConfigHandlers(bot: Bot<BotContext>): void {
@@ -47,18 +48,20 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
 
     const scope = ctx.chat.type === "private" ? "Default" : "Group";
     const rateStr = unitAmount > 0 ? `${formatAmount(unitAmount)}/hr` : "Not set";
+    const addressText = address === "Not set" ? address : `<code>${escapeHtml(address)}</code>`;
+    const remarkText = remark === "Not set" ? remark : `<code>${escapeHtml(remark)}</code>`;
 
     const lines = [
-      `*⚙️ Settings Dashboard (${scope})*`,
+      `<b>⚙️ Settings Dashboard (${escapeHtml(scope)})</b>`,
       "",
-      `*Hourly Rate:* ${rateStr}`,
-      `*Billing Granularity:* ${granularity} min`,
+      `<b>Hourly Rate:</b> ${escapeHtml(rateStr)}`,
+      `<b>Billing Granularity:</b> ${granularity} min`,
     ];
 
     if (ctx.chat.type === "private") {
       lines.push(
-        `*Payment Address:* ` + (address === "Not set" ? address : `\`${address}\``),
-        `*Invoice Remark:* ${remark}`
+        `<b>Payment Address:</b> ${addressText}`,
+        `<b>Invoice Remark:</b> ${remarkText}`
       );
     }
 
@@ -72,7 +75,7 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
         .text("✏️ Edit Remark", "edit_remark");
     }
 
-    await ctx.reply(lines.join("\n"), { parse_mode: "Markdown", reply_markup: keyboard });
+    await ctx.reply(lines.join("\n"), { parse_mode: "HTML", reply_markup: keyboard });
   });
 
   // Callbacks for settings
@@ -155,7 +158,9 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
       await upsertCustomer(db, userId, ctx.from?.first_name);
       await updateCustomerPaymentAddress(db, userId, input);
       await invalidateCustomerCache(kv, userId);
-      await ctx.reply(`✅ Payment address updated to \`${input}\``, { parse_mode: "Markdown" });
+      await ctx.reply(`✅ Payment address updated to:\n<code>${escapeHtml(input)}</code>`, {
+        parse_mode: "HTML"
+      });
 
     } else if (promptText.includes("invoice remark")) {
       await upsertCustomer(db, userId, ctx.from?.first_name);
@@ -164,7 +169,9 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
       metadata.remark = input;
       await updateCustomerMetadata(db, userId, metadata);
       await invalidateCustomerCache(kv, userId);
-      await ctx.reply(`✅ Invoice remark updated to:\n\`${input}\``, { parse_mode: "Markdown" });
+      await ctx.reply(`✅ Invoice remark updated to:\n<code>${escapeHtml(input)}</code>`, {
+        parse_mode: "HTML"
+      });
 
     } else {
       return next();
@@ -241,8 +248,8 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
     await updateCustomerPaymentAddress(db, userId, address);
     await invalidateCustomerCache(kv, userId);
 
-    await ctx.reply(`All set! Payment address updated to \`${address}\``, {
-      parse_mode: "Markdown",
+    await ctx.reply(`All set! Payment address updated to:\n<code>${escapeHtml(address)}</code>`, {
+      parse_mode: "HTML",
     });
   });
 
@@ -277,8 +284,8 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
     await updateCustomerMetadata(db, userId, metadata);
     await invalidateCustomerCache(kv, userId);
 
-    await ctx.reply(`Noted! Invoice remark set to:\n\`${remark}\``, {
-      parse_mode: "Markdown",
+    await ctx.reply(`Noted! Invoice remark set to:\n<code>${escapeHtml(remark)}</code>`, {
+      parse_mode: "HTML",
     });
   });
 

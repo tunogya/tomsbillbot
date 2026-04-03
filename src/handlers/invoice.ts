@@ -25,6 +25,7 @@ import {
 } from "../services/db";
 import { getCachedCustomer, getCachedUnitAmount } from "../utils/cache";
 import { formatAmount, formatDuration, formatTimestamp, sumDurations } from "../utils/time";
+import { escapeHtml } from "../utils/telegram";
 import type { BotContext } from "../env";
 
 import { ensureGroupChat } from "../utils/bot";
@@ -72,30 +73,30 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
     const totalMinutes = sumDurations(sessions);
 
     const lines = [
-      `*Tom's Bill Bot presents Invoice #${invoice.id}*`,
-      `• Status: \`${invoice.status.toUpperCase()}\``,
+      `<b>Tom's Bill Bot presents Invoice #${invoice.id}</b>`,
+      `• Status: <code>${escapeHtml(invoice.status.toUpperCase())}</code>`,
       `• Sessions: ${sessions.length}`,
-      `• Total Hours: \`${formatDuration(totalMinutes)}\``,
-      `• Rate: \`$${formatAmount(unitAmount)}/hr\``,
-      `• Amount: \`$${formatAmount(invoice.total)}\``,
+      `• Total Hours: <code>${formatDuration(totalMinutes)}</code>`,
+      `• Rate: <code>$${formatAmount(unitAmount)}/hr</code>`,
+      `• Amount: <code>$${formatAmount(invoice.total)}</code>`,
       "",
-      `*Summary:*`,
-      `• Total Invoiced: \`$${formatAmount(summary.total_invoiced)}\``,
-      `• Total Paid: \`$${formatAmount(summary.total_paid)}\``,
+      `<b>Summary:</b>`,
+      `• Total Invoiced: <code>$${formatAmount(summary.total_invoiced)}</code>`,
+      `• Total Paid: <code>$${formatAmount(summary.total_paid)}</code>`,
       "",
-      `• Unpaid: \`$${formatAmount(Math.max(0, unpaid))}\``
+      `• Unpaid: <code>$${formatAmount(Math.max(0, unpaid))}</code>`
     ];
 
     if (customer?.payment_address) {
-      lines.push("", `Pay to: \`${customer.payment_address}\``);
+      lines.push("", `Pay to: <code>${escapeHtml(customer.payment_address)}</code>`);
     }
 
     const metadata = customer ? parseMetadata(customer.metadata) : {};
     if (metadata.remark) {
-      lines.push(`Remark: ${metadata.remark}`);
+      lines.push(`Remark: ${escapeHtml(metadata.remark)}`);
     }
 
-    await ctx.reply(lines.join("\n"), { parse_mode: "Markdown" });
+    await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
   });
 
   bot.command("invoices", async (ctx) => {

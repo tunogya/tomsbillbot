@@ -19,6 +19,7 @@
 		"dev": "wrangler dev",
 		"predeploy": "wrangler d1 migrations apply DB --remote",
 		"migrate:local": "wrangler d1 migrations apply DB --local",
-		"test": "wrangler deploy --dry-run"
+		"test": "wrangler deploy --dry-run",
+		"test:integration": "vitest run tests/integration/bot.test.ts --environment node"
 	}
 }

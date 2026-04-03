@@ -20,6 +20,7 @@ import { registerBalanceHandler } from "./handlers/balance";
 import { registerChatCleanupHandler } from "./handlers/chatCleanup";
 import { registerHelpHandler } from "./handlers/help";
 import { checkRateLimit } from "./utils/ratelimit";
+import { isCommandText } from "./utils/telegram";
 import type { AppEnv, BotContext } from "./env";
 
 /**
@@ -31,7 +32,15 @@ import type { AppEnv, BotContext } from "./env";
 export function createBot(
   env: AppEnv
 ): Bot<BotContext> {
-  const bot = new Bot<BotContext>(env.BOT_TOKEN);
+  const bot = new Bot<BotContext>(env.BOT_TOKEN, {
+    client: {
+      // Prefer the runtime's native fetch implementation in every environment.
+      fetch: (
+        input: Parameters<typeof fetch>[0],
+        init?: Parameters<typeof fetch>[1]
+      ) => fetch(input, init),
+    },
+  });
 
   // Inject bindings into context
   bot.use(async (ctx, next) => {
@@ -60,11 +69,16 @@ export function createBot(
 
   // Rate limiting middleware - drop excessive commands
   bot.use(async (ctx, next) => {
+    if (!isCommandText(ctx.message?.text)) {
+      await next();
+      return;
+    }
+
     const userId = ctx.from?.id;
     if (userId) {
       const allowed = await checkRateLimit(ctx.kv, userId);
       if (!allowed) {
-        await ctx.reply("Whoa there! You're sending commands too fast. Please slow down.");
+        await ctx.reply("Whoa there! You're sending commands too fast. Please slow down for a minute and try again.");
         return;
       }
     }
@@ -97,4 +111,3 @@ export function createBot(
 
   return bot;
 }
-
