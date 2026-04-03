@@ -91,9 +91,9 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
     metadata.language = next;
     await updateCustomerMetadata(ctx.db, userId, metadata);
     await invalidateCustomerCache(ctx.kv, userId);
+    await ctx.kv.delete(`customer:lang:${userId}`);
     await ctx.answerCallbackQuery({ text: `Language: ${next.toUpperCase()}` });
-    // Refresh would be nice but it's okay to just answer
-    await ctx.reply("Language updated. Use /settings to see changes.");
+    await ctx.reply(ctx.t("settings_updated", { field: "Language", value: next.toUpperCase() }), { parse_mode: "HTML" });
   });
 
   // Callbacks for settings

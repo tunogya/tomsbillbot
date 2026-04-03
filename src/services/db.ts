@@ -443,12 +443,7 @@ export async function completeWorkSession(
     await resumeWork(db, sessionId);
   }
 
-  // Calculate total break duration to subtract from total elapsed time if we want exact duration,
-  // but the handler already passes durationMins.
-  // We should probably ensure durationMins is correct if we had breaks.
-  // Actually, the handler calculates duration based on start_time and end_time.
-  // If we have breaks, we should subtract them.
-
+  // Subtract break time from total duration
   const breaks = await db
     .prepare(`SELECT SUM(duration_minutes) as total_break_mins FROM breaks WHERE work_session_id = ?`)
     .bind(sessionId)
@@ -562,6 +557,21 @@ export async function getUninvoicedSessions(
     .prepare(query)
     .bind(...params)
     .all<WorkSession>();
+  return result.results ?? [];
+}
+
+/** Get ALL active sessions in a chat (all users). Used by chatCleanup. */
+export async function getAllActiveSessionsByChat(
+  db: D1Database,
+  chatId: number
+): Promise<{ id: number; customer_id: number; start_time: number }[]> {
+  const result = await db
+    .prepare(
+      `SELECT id, customer_id, start_time FROM work_sessions
+       WHERE chat_id = ? AND status = ?`
+    )
+    .bind(chatId, SESSION_STATUS.ACTIVE)
+    .all<{ id: number; customer_id: number; start_time: number }>();
   return result.results ?? [];
 }
 

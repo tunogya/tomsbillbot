@@ -70,7 +70,7 @@ export const zh: Locale = {
   "invoice_title": "<b>Tom's Bill Bot 提交的账单 #{id}{tag}</b>",
   "invoice_no_rate": "Tom's Bill Bot 注意到您在此群组的时薪尚未设置！请先使用 <code>/setrate <amount></code>。",
   "invoice_empty": "Tom's Bill Bot 在此找不到任何未开票的工时或支出{tag}。全部搞定！",
-  "invoice_summary_title": "<b>摘要：</b>",
+  "invoice_summary_title": "摘要：",
   "invoice_unpaid": "• 待付：<code>${amount}</code>",
   "invoice_pay_to": "付款至：<code>{address}</code>",
   "invoice_remark": "备注：{remark}",

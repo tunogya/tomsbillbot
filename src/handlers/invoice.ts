@@ -50,9 +50,11 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
       return;
     }
 
-    // Get uninvoiced completed sessions in this chat
-    const sessions = await getUninvoicedSessions(db, userId, chatId, tag);
-    const expenses = await getUninvoicedExpenses(db, userId, chatId);
+    // Get uninvoiced completed sessions and expenses in parallel
+    const [sessions, expenses] = await Promise.all([
+      getUninvoicedSessions(db, userId, chatId, tag),
+      getUninvoicedExpenses(db, userId, chatId),
+    ]);
 
     if (sessions.length === 0 && expenses.length === 0) {
       const tagInfo = tag ? ` with project #${tag}` : "";
@@ -228,9 +230,11 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
     const tagMatch = match?.match(/#(\w+)/);
     const tag = tagMatch ? tagMatch[1] : null;
 
-    // Get uninvoiced completed sessions in this chat
-    const sessions = await getUninvoicedSessions(db, userId, chatId, tag);
-    const expenses = await getUninvoicedExpenses(db, userId, chatId);
+    // Get uninvoiced completed sessions and expenses in parallel
+    const [sessions, expenses] = await Promise.all([
+      getUninvoicedSessions(db, userId, chatId, tag),
+      getUninvoicedExpenses(db, userId, chatId),
+    ]);
     if (sessions.length === 0 && expenses.length === 0) {
       await ctx.reply(ctx.t("invoice_empty", { tag: "" }));
       return;
@@ -252,7 +256,7 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
         return `${i + 1}. Session: ${date} - <code>${formatDuration(s.duration_minutes ?? 0)}h</code>${tagInfo}`;
       }),
       ...expenses.map((e, i) => {
-        return `${sessions.length + i + 1}. Expense: <code>$${formatAmount(e.amount)}</code> - ${e.description}`;
+        return `${sessions.length + i + 1}. Expense: <code>$${formatAmount(e.amount)}</code> - ${escapeHtml(e.description ?? "")}`;
       }),
       "",
       `<b>Total Unbilled Hours:</b> <code>${formatDuration(totalMinutes)} hours</code>`,

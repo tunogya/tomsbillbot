@@ -69,7 +69,7 @@ export const en = {
   "invoice_title": "<b>Tom's Bill Bot presents Invoice #{id}{tag}</b>",
   "invoice_no_rate": "Tom's Bill Bot noticed your hourly rate for this chat is missing! Use <code>/setrate <amount></code> first.",
   "invoice_empty": "Tom's Bill Bot couldn't find any uninvoiced work sessions or expenses here{tag}. All caught up!",
-  "invoice_summary_title": "<b>Summary:</b>",
+  "invoice_summary_title": "Summary:",
   "invoice_unpaid": "• Unpaid: <code>${amount}</code>",
   "invoice_pay_to": "Pay to: <code>{address}</code>",
   "invoice_remark": "Remark: {remark}",
