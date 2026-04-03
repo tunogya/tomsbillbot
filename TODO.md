@@ -13,8 +13,8 @@
 
 ## P2: Team & reporting
 
-- [ ] **`/team` command** (#12) — Group admin dashboard: who's working now, hours per member this week, outstanding invoices per member. Group command.
-- [ ] **Daily/weekly work summary** (#13) — Opt-in auto-report via DM. "This week: 23.5 hrs across 3 groups, unbilled: 8 hrs ($400)." Extend cron trigger + user preference in metadata.
+- [x] **`/team` command** (#12) — Group admin dashboard: who's working now, hours per member this week, outstanding invoices per member. Group command.
+- [x] **Daily/weekly work summary** (#13) — Opt-in auto-report via DM. "This week: 23.5 hrs across 3 groups, unbilled: 8 hrs ($400)." Extend cron trigger + user preference in metadata.
 
 ## P3: Polish
 

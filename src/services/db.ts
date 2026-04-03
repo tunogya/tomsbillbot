@@ -565,18 +565,64 @@ export async function getUninvoicedSessions(
   return result.results ?? [];
 }
 
-/** Get ALL active sessions in a chat (all users). Used by chatCleanup. */
-export async function getAllActiveSessionsByChat(
+/** Get all active sessions in a chat with user names. */
+export async function getGroupActiveSessions(
   db: D1Database,
   chatId: number
-): Promise<{ id: number; customer_id: number; start_time: number }[]> {
+): Promise<{ id: number; customer_id: number; customer_name: string; start_time: number }[]> {
   const result = await db
     .prepare(
-      `SELECT id, customer_id, start_time FROM work_sessions
-       WHERE chat_id = ? AND status = ?`
+      `SELECT ws.id, ws.customer_id, c.name as customer_name, ws.start_time
+       FROM work_sessions ws
+       JOIN customers c ON ws.customer_id = c.id
+       WHERE ws.chat_id = ? AND ws.status = ?`
     )
     .bind(chatId, SESSION_STATUS.ACTIVE)
-    .all<{ id: number; customer_id: number; start_time: number }>();
+    .all<{ id: number; customer_id: number; customer_name: string; start_time: number }>();
+  return result.results ?? [];
+}
+
+/** Get unbilled hours and outstanding balance for all members in a group. */
+export async function getGroupMemberSummaries(
+  db: D1Database,
+  chatId: number
+): Promise<{
+  customer_id: number;
+  customer_name: string;
+  unbilled_minutes: number;
+  outstanding_cents: number;
+}[]> {
+  // This is a complex query to get both unbilled mins and balance per user in one go
+  const result = await db
+    .prepare(
+      `SELECT
+         c.id as customer_id,
+         c.name as customer_name,
+         COALESCE(ws.unbilled_minutes, 0) as unbilled_minutes,
+         COALESCE(bal.outstanding_cents, 0) as outstanding_cents
+       FROM customers c
+       LEFT JOIN (
+         SELECT customer_id, SUM(duration_minutes) as unbilled_minutes
+         FROM work_sessions
+         WHERE chat_id = ?1 AND status = 'completed' AND invoice_id IS NULL
+         GROUP BY customer_id
+       ) ws ON c.id = ws.customer_id
+       LEFT JOIN (
+         SELECT customer_id, SUM(amount) as outstanding_cents
+         FROM balance_transactions
+         WHERE chat_id = ?1
+         GROUP BY customer_id
+       ) bal ON c.id = bal.customer_id
+       WHERE ws.unbilled_minutes > 0 OR bal.outstanding_cents > 0`
+    )
+    .bind(chatId)
+    .all<{
+      customer_id: number;
+      customer_name: string;
+      unbilled_minutes: number;
+      outstanding_cents: number;
+    }>();
+
   return result.results ?? [];
 }
 
@@ -1095,4 +1141,39 @@ export async function getInvoiceAmountDue(
     .bind(invoiceId, customerId, chatId)
     .first<{ amount_due: number }>();
   return result?.amount_due ?? 0;
+}
+
+/** Get unbilled work summary across all groups for a user. */
+export async function getUserGlobalUnbilled(
+  db: D1Database,
+  customerId: number
+): Promise<{ chat_id: number; unbilled_minutes: number; unit_amount: number }[]> {
+  // We need to join with prices to get the rate for each group
+  const result = await db
+    .prepare(
+      `SELECT
+         ws.chat_id,
+         SUM(ws.duration_minutes) as unbilled_minutes,
+         COALESCE(p.unit_amount, (SELECT unit_amount FROM prices WHERE customer_id = ?1 AND chat_id = 0), 0) as unit_amount
+       FROM work_sessions ws
+       LEFT JOIN prices p ON ws.customer_id = p.customer_id AND ws.chat_id = p.chat_id
+       WHERE ws.customer_id = ?1 AND ws.status = 'completed' AND ws.invoice_id IS NULL
+       GROUP BY ws.chat_id`
+    )
+    .bind(customerId)
+    .all<{ chat_id: number; unbilled_minutes: number; unit_amount: number }>();
+
+  return result.results ?? [];
+}
+
+/** Get all customers who have opted in for summaries. */
+export async function getCustomersForSummary(
+  db: D1Database
+): Promise<Customer[]> {
+  // Since metadata is JSON, we use SQLite's JSON functions if available,
+  // or just filter in JS. D1 supports json_extract.
+  const result = await db
+    .prepare(`SELECT * FROM customers WHERE json_extract(metadata, '$.summary_frequency') IS NOT NULL AND json_extract(metadata, '$.summary_frequency') != 'off'`)
+    .all<Customer>();
+  return result.results ?? [];
 }

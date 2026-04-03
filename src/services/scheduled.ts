@@ -10,13 +10,16 @@
  */
 
 import type { AppEnv } from "../env";
-import { nowTs, durationMinutes, formatDuration, formatAmount } from "../utils/time";
+import { nowTs, durationMinutes, formatDuration, formatAmount, computeAmount } from "../utils/time";
 import { sendTelegramMessage } from "../utils/bot";
 import { escapeHtml } from "../utils/telegram";
+import { getCustomersForSummary, getUserGlobalUnbilled, parseMetadata } from "./db";
 
 const STALE_THRESHOLD = 12 * 60 * 60; // 12 hours in seconds
 const ABANDON_THRESHOLD = 24 * 60 * 60; // 24 hours in seconds
 const INVOICE_REMIND_THRESHOLD = 7 * 24 * 60 * 60; // 7 days in seconds
+const DAY_IN_SECONDS = 24 * 60 * 60;
+const WEEK_IN_SECONDS = 7 * 24 * 60 * 60;
 
 interface StaleSession {
   id: number;
@@ -133,5 +136,59 @@ export async function handleScheduled(env: AppEnv): Promise<void> {
     await env.KV.put(reminderKey, "1", { expirationTtl: INVOICE_REMIND_THRESHOLD });
 
     console.log(`[scheduled] Reminded about unpaid invoice #${inv.id}`);
+  }
+
+  // ── 4. Send Work Summaries (Daily/Weekly) ─────────────────────
+  const summaryUsers = await getCustomersForSummary(env.DB);
+  for (const customer of summaryUsers) {
+    const metadata = parseMetadata(customer.metadata);
+    const freq = metadata.summary_frequency;
+    if (!freq || freq === "off") continue;
+
+    const interval = freq === "daily" ? DAY_IN_SECONDS : WEEK_IN_SECONDS;
+    const lastSummaryKey = `last_summary:${customer.id}`;
+    const lastSummaryTsStr = await env.KV.get(lastSummaryKey);
+    const lastSummaryTs = lastSummaryTsStr ? parseInt(lastSummaryTsStr, 10) : 0;
+
+    if (now - lastSummaryTs < interval) continue;
+
+    // Time for summary!
+    const unbilled = await getUserGlobalUnbilled(env.DB, customer.id);
+    if (unbilled.length === 0) {
+      // Still update the timestamp so we don't keep checking every 6h if they have no work
+      await env.KV.put(lastSummaryKey, now.toString());
+      continue;
+    }
+
+    let totalMins = 0;
+    let totalCents = 0;
+    const lines = [
+      `📊 <b>Your ${freq.charAt(0).toUpperCase() + freq.slice(1)} Work Summary</b>`,
+      "",
+    ];
+
+    for (const group of unbilled) {
+      const amount = computeAmount(group.unbilled_minutes, group.unit_amount);
+      totalMins += group.unbilled_minutes;
+      totalCents += amount;
+      lines.push(`• Group <code>${group.chat_id}</code>: ${formatDuration(group.unbilled_minutes)}h ($${formatAmount(amount)})`);
+    }
+
+    lines.push(
+      "",
+      `<b>Total Unbilled:</b> <code>${formatDuration(totalMins)} hours</code>`,
+      `<b>Estimated Value:</b> <code>$${formatAmount(totalCents)}</code>`,
+      "",
+      `<i>You can change summary frequency in /settings</i>`
+    );
+
+    // Send DM
+    try {
+      await sendTelegramMessage(env.BOT_TOKEN, customer.id, lines.join("\n"));
+      await env.KV.put(lastSummaryKey, now.toString());
+      console.log(`[scheduled] Sent ${freq} summary to user ${customer.id}`);
+    } catch (err) {
+      console.error(`[scheduled] Failed to send summary to user ${customer.id}:`, err);
+    }
   }
 }

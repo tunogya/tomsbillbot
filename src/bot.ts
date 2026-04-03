@@ -19,6 +19,7 @@ import { registerStatsHandler } from "./handlers/stats";
 import { registerExportHandler } from "./handlers/export";
 import { registerBalanceHandler } from "./handlers/balance";
 import { registerHistoryHandler } from "./handlers/history";
+import { registerTeamHandler } from "./handlers/team";
 import { registerChatCleanupHandler } from "./handlers/chatCleanup";
 import { registerHelpHandler } from "./handlers/help";
 import { checkRateLimit } from "./utils/ratelimit";
@@ -100,6 +101,7 @@ export function createBot(
   registerExportHandler(bot);
   registerBalanceHandler(bot);
   registerHistoryHandler(bot);
+  registerTeamHandler(bot);
   registerChatCleanupHandler(bot);
   registerHelpHandler(bot);
 

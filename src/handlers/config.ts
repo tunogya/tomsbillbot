@@ -46,6 +46,7 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
     const metadata = customer ? parseMetadata(customer.metadata) : {};
     const remark = metadata.remark || "Not set";
     const timezone = metadata.timezone || "UTC";
+    const summaryFreq = metadata.summary_frequency || "off";
 
     const scope = ctx.chat.type === "private" ? "Default" : "Group";
     const rateStr = unitAmount > 0 ? `${formatAmount(unitAmount)}/hr` : "Not set";
@@ -63,7 +64,8 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
     if (ctx.chat.type === "private") {
       lines.push(
         `<b>Payment Address:</b> ${addressText}`,
-        `<b>Invoice Remark:</b> ${remarkText}`
+        `<b>Invoice Remark:</b> ${remarkText}`,
+        `<b>Work Summary:</b> <code>${escapeHtml(summaryFreq.toUpperCase())}</code>`
       );
     }
 
@@ -75,7 +77,8 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
     if (ctx.chat.type === "private") {
       keyboard
         .text("✏️ Address", "edit_address")
-        .text("✏️ Remark", "edit_remark");
+        .text("✏️ Remark", "edit_remark")
+        .text("📊 Summary: " + summaryFreq.toUpperCase(), "toggle_summary");
     }
 
     await ctx.reply(lines.join("\n"), { parse_mode: "HTML", reply_markup: keyboard });
@@ -120,6 +123,55 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
       parse_mode: "HTML",
       reply_markup: { force_reply: true, selective: true }
     });
+  });
+
+  bot.callbackQuery(/^toggle_summary$/, async (ctx) => {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+
+    const { db, kv } = ctx;
+    const customer = await getCustomer(db, userId);
+    const metadata = customer ? parseMetadata(customer.metadata) : {};
+
+    const current = metadata.summary_frequency || "off";
+    const next = current === "off" ? "daily" : current === "daily" ? "weekly" : "off";
+
+    metadata.summary_frequency = next;
+    await updateCustomerMetadata(db, userId, metadata);
+    await invalidateCustomerCache(kv, userId);
+
+    await ctx.answerCallbackQuery({ text: `Summary frequency: ${next.toUpperCase()}` });
+
+    // Refresh dashboard
+    const [unitAmount, granularity] = await Promise.all([
+      getCachedUnitAmount(kv, db, userId, 0),
+      getCachedGranularity(kv, db, userId, 0)
+    ]);
+
+    const address = customer?.payment_address || "Not set";
+    const remark = metadata.remark || "Not set";
+    const timezone = metadata.timezone || "UTC";
+
+    const lines = [
+      `<b>⚙️ Settings Dashboard (Default)</b>`,
+      "",
+      `<b>Hourly Rate:</b> ${unitAmount > 0 ? `${formatAmount(unitAmount)}/hr` : "Not set"}`,
+      `<b>Billing Granularity:</b> ${granularity} min`,
+      `<b>Timezone:</b> <code>${escapeHtml(timezone)}</code>`,
+      `<b>Payment Address:</b> ${address === "Not set" ? address : `<code>${escapeHtml(address)}</code>`}`,
+      `<b>Invoice Remark:</b> ${remark === "Not set" ? remark : `<code>${escapeHtml(remark)}</code>`}`,
+      `<b>Work Summary:</b> <code>${escapeHtml(next.toUpperCase())}</code>`
+    ];
+
+    const keyboard = new InlineKeyboard()
+      .text("✏️ Rate", "edit_rate")
+      .text("✏️ Granularity", "edit_granularity")
+      .text("✏️ Timezone", "edit_timezone").row()
+      .text("✏️ Address", "edit_address")
+      .text("✏️ Remark", "edit_remark")
+      .text("📊 Summary: " + next.toUpperCase(), "toggle_summary");
+
+    await ctx.editMessageText(lines.join("\n"), { parse_mode: "HTML", reply_markup: keyboard });
   });
 
   // Handle ForceReply messages
