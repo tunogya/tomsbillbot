@@ -31,20 +31,20 @@ export function registerStatsHandler(bot: Bot<BotContext>): void {
     const unbilledEarnings = computeAmount(weekStats.unbilled_minutes, unitAmount);
 
     const lines = [
-      `*Your Work Stats 📊*`,
+      "<b>Your Work Stats 📊</b>",
       "",
-      `*This Week:*`,
-      `• Total Hours: \`${formatDuration(weekStats.total_minutes)} hrs\``,
+      "<b>This Week:</b>",
+      `• Total Hours: <code>${formatDuration(weekStats.total_minutes)} hrs</code>`,
       "",
-      `*This Month:*`,
-      `• Total Hours: \`${formatDuration(monthStats.total_minutes)} hrs\``,
+      "<b>This Month:</b>",
+      `• Total Hours: <code>${formatDuration(monthStats.total_minutes)} hrs</code>`,
       "",
-      `*Current Status:*`,
-      `• Unbilled Hours: \`${formatDuration(weekStats.unbilled_minutes)} hrs\``,
-      `• Estimated Value: \`$${formatAmount(unbilledEarnings)}\``,
-      `• Outstanding Invoices: \`$${formatAmount(Math.max(0, summary.total_invoiced - summary.total_paid))}\``
+      "<b>Current Status:</b>",
+      `• Unbilled Hours: <code>${formatDuration(weekStats.unbilled_minutes)} hrs</code>`,
+      `• Estimated Value: <code>$${formatAmount(unbilledEarnings)}</code>`,
+      `• Outstanding Invoices: <code>$${formatAmount(Math.max(0, summary.total_invoiced - summary.total_paid))}</code>`
     ];
 
-    await ctx.reply(lines.join("\n"), { parse_mode: "Markdown" });
+    await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
   });
 }

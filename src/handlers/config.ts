@@ -81,16 +81,16 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
   // Callbacks for settings
   bot.callbackQuery(/^edit_rate$/, async (ctx) => {
     await ctx.answerCallbackQuery();
-    await ctx.reply("Please reply to this message with your new hourly rate (e.g., `50`):", {
-      parse_mode: "Markdown",
+    await ctx.reply("Please reply to this message with your new hourly rate (e.g., <code>50</code>):", {
+      parse_mode: "HTML",
       reply_markup: { force_reply: true, selective: true }
     });
   });
 
   bot.callbackQuery(/^edit_granularity$/, async (ctx) => {
     await ctx.answerCallbackQuery();
-    await ctx.reply("Please reply to this message with your new billing granularity in minutes (e.g., `30` for half-hour):", {
-      parse_mode: "Markdown",
+    await ctx.reply("Please reply to this message with your new billing granularity in minutes (e.g., <code>30</code> for half-hour):", {
+      parse_mode: "HTML",
       reply_markup: { force_reply: true, selective: true }
     });
   });
@@ -98,7 +98,7 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
   bot.callbackQuery(/^edit_address$/, async (ctx) => {
     await ctx.answerCallbackQuery();
     await ctx.reply("Please reply to this message with your new USDT payment address:", {
-      parse_mode: "Markdown",
+      parse_mode: "HTML",
       reply_markup: { force_reply: true, selective: true }
     });
   });
@@ -106,7 +106,7 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
   bot.callbackQuery(/^edit_remark$/, async (ctx) => {
     await ctx.answerCallbackQuery();
     await ctx.reply("Please reply to this message with your new invoice remark:", {
-      parse_mode: "Markdown",
+      parse_mode: "HTML",
       reply_markup: { force_reply: true, selective: true }
     });
   });
@@ -140,8 +140,8 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
         await setUnitAmount(db, userId, chatId, unitAmountCents);
         await invalidateRateCache(kv, userId, chatId);
       }
-      await ctx.reply(`✅ Hourly rate updated to \`${formatAmount(unitAmountCents)}/hr\``, { parse_mode: "Markdown" });
-      
+      await ctx.reply(`✅ Hourly rate updated to <code>${escapeHtml(formatAmount(unitAmountCents))}/hr</code>`, { parse_mode: "HTML" });
+
     } else if (promptText.includes("billing granularity")) {
       const value = parseInt(input, 10);
       if (isNaN(value) || value < 1 || value > 480) {
@@ -152,7 +152,7 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
       const targetChatId = ctx.chat.type === "private" ? 0 : chatId;
       await updatePriceMetadata(db, userId, targetChatId, { granularity_minutes: value });
       await invalidateGranularityCache(kv, userId, targetChatId);
-      await ctx.reply(`✅ Granularity updated to \`${value} minutes\``, { parse_mode: "Markdown" });
+      await ctx.reply(`✅ Granularity updated to <code>${value} minutes</code>`, { parse_mode: "HTML" });
 
     } else if (promptText.includes("payment address")) {
       await upsertCustomer(db, userId, ctx.from?.first_name);
@@ -191,8 +191,8 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
     const rateStr = parts[1];
 
     if (!rateStr) {
-      await ctx.reply("Hold your horses! Usage: `/setrate <amount>`\nExample: `/setrate 50`", {
-        parse_mode: "Markdown",
+      await ctx.reply("Hold your horses! Usage: <code>/setrate &lt;amount&gt;</code>\nExample: <code>/setrate 50</code>", {
+        parse_mode: "HTML",
       });
       return;
     }
@@ -214,14 +214,14 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
     if (ctx.chat.type === "private") {
       await setDefaultUnitAmount(db, userId, unitAmountCents);
       await invalidateRateCache(kv, userId, 0);
-      await ctx.reply(`Got it! *Default* hourly rate set to \`$${formatAmount(unitAmountCents)}/hr\``, {
-        parse_mode: "Markdown",
+      await ctx.reply(`Got it! <b>Default</b> hourly rate set to <code>$${formatAmount(unitAmountCents)}/hr</code>`, {
+        parse_mode: "HTML",
       });
     } else {
       await setUnitAmount(db, userId, chatId, unitAmountCents);
       await invalidateRateCache(kv, userId, chatId);
-      await ctx.reply(`Got it! *Group-specific* hourly rate set to \`$${formatAmount(unitAmountCents)}/hr\``, {
-        parse_mode: "Markdown",
+      await ctx.reply(`Got it! <b>Group-specific</b> hourly rate set to <code>$${formatAmount(unitAmountCents)}/hr</code>`, {
+        parse_mode: "HTML",
       });
     }
   });
@@ -238,8 +238,8 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
 
     if (!address) {
       await ctx.reply(
-        "Hold your horses! Usage: `/setaddress <USDT_address>`\nExample: `/setaddress TXyz...`",
-        { parse_mode: "Markdown" }
+        "Hold your horses! Usage: <code>/setaddress &lt;USDT_address&gt;</code>\nExample: <code>/setaddress TXyz...</code>",
+        { parse_mode: "HTML" }
       );
       return;
     }
@@ -269,8 +269,8 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
 
     if (!remark) {
       await ctx.reply(
-        "Hold your horses! Usage: `/setremark <remark_text>`\nExample: `/setremark Network: TRC20`",
-        { parse_mode: "Markdown" }
+        "Hold your horses! Usage: <code>/setremark &lt;remark_text&gt;</code>\nExample: <code>/setremark Network: TRC20</code>",
+        { parse_mode: "HTML" }
       );
       return;
     }
@@ -301,13 +301,13 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
 
     if (!valueStr) {
       await ctx.reply(
-        "Hold your horses! Usage: `/setgranularity <minutes>`\n" +
+        "Hold your horses! Usage: <code>/setgranularity &lt;minutes&gt;</code>\n" +
         "Examples:\n" +
-        "• `/setgranularity 1` - per-minute billing\n" +
-        "• `/setgranularity 5` - per-5-min blocks\n" +
-        "• `/setgranularity 30` - per-half-hour (default)\n" +
-        "• `/setgranularity 60` - per-hour blocks",
-        { parse_mode: "Markdown" }
+        "• <code>/setgranularity 1</code> - per-minute billing\n" +
+        "• <code>/setgranularity 5</code> - per-5-min blocks\n" +
+        "• <code>/setgranularity 30</code> - per-half-hour (default)\n" +
+        "• <code>/setgranularity 60</code> - per-hour blocks",
+        { parse_mode: "HTML" }
       );
       return;
     }
@@ -332,8 +332,8 @@ export function registerConfigHandlers(bot: Bot<BotContext>): void {
       value === 60 ? "60 minutes (per-hour)" :
         `${value} minutes`;
 
-    await ctx.reply(`Got it! *${scope}* billing granularity set to \`${label}\``, {
-      parse_mode: "Markdown",
+    await ctx.reply(`Got it! <b>${escapeHtml(scope)}</b> billing granularity set to <code>${escapeHtml(label)}</code>`, {
+      parse_mode: "HTML",
     });
   });
 }

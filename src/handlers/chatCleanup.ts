@@ -23,10 +23,9 @@ import {
   getInvoiceSummary,
   getCustomer,
   parseMetadata,
-  SESSION_STATUS,
-  INVOICE_STATUS,
 } from "../services/db";
 import { nowTs, durationMinutes, formatDuration, formatAmount } from "../utils/time";
+import { escapeHtml } from "../utils/telegram";
 import type { BotContext } from "../env";
 import { sendTelegramMessage } from "../utils/bot";
 
@@ -111,37 +110,37 @@ export function registerChatCleanupHandler(
         const unpaid = Math.max(0, summary.total_invoiced - summary.total_paid);
 
         const lines = [
-          `*Bill Backup - ${chatTitle}*`,
-          ``,
-          `The bot was removed from the group. Here is your billing summary:`,
-          ``,
-          `*Open Invoices (${invoices.length}):*`,
+          `<b>Bill Backup - ${escapeHtml(chatTitle)}</b>`,
+          "",
+          "The bot was removed from the group. Here is your billing summary:",
+          "",
+          `<b>Open Invoices (${invoices.length}):</b>`,
         ];
 
         for (const inv of invoices) {
           lines.push(
-            `• Invoice #${inv.id} - \`$${formatAmount(inv.amount_due)}\` due`
+            `• Invoice #${inv.id} - <code>$${formatAmount(inv.amount_due)}</code> due`
           );
         }
 
         lines.push(
-          ``,
-          `*Balance:*`,
-          `• Total Invoiced: \`$${formatAmount(summary.total_invoiced)}\``,
-          `• Total Paid: \`$${formatAmount(summary.total_paid)}\``,
-          `• Unpaid: \`$${formatAmount(unpaid)}\``,
+          "",
+          "<b>Balance:</b>",
+          `• Total Invoiced: <code>$${formatAmount(summary.total_invoiced)}</code>`,
+          `• Total Paid: <code>$${formatAmount(summary.total_paid)}</code>`,
+          `• Unpaid: <code>$${formatAmount(unpaid)}</code>`,
         );
 
         if (customer?.payment_address) {
-          lines.push(``, `Pay to: \`${customer.payment_address}\``);
+          lines.push("", `Pay to: <code>${escapeHtml(customer.payment_address)}</code>`);
         }
 
         const metadata = customer ? parseMetadata(customer.metadata) : {};
         if (metadata.remark) {
-          lines.push(`Remark: ${metadata.remark}`);
+          lines.push(`Remark: ${escapeHtml(metadata.remark)}`);
         }
 
-        lines.push(``, `_This is a backup copy. The group data has been cleared._`);
+        lines.push("", "<i>This is a backup copy. The group data has been cleared.</i>");
 
         const sent = await sendTelegramMessage(botToken, customerId, lines.join("\n"));
         if (sent) {

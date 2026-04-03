@@ -32,8 +32,8 @@ export function registerPaymentHandler(bot: Bot<BotContext>): void {
     const amountStr = parts[1];
 
     if (!amountStr) {
-      await ctx.reply("Hold your horses! Usage: `/paid <amount>`\nExample: `/paid 100`", {
-        parse_mode: "Markdown",
+      await ctx.reply("Hold your horses! Usage: <code>/paid &lt;amount&gt;</code>\nExample: <code>/paid 100</code>", {
+        parse_mode: "HTML",
       });
       return;
     }
@@ -52,9 +52,9 @@ export function registerPaymentHandler(bot: Bot<BotContext>): void {
       .text("❌ Cancel", `cancel_paid:${userId}`);
 
     await ctx.reply(
-      `*⚠️ RECORD PAYMENT?*\n\n` +
-      `You are about to record a payment of \`$${formatAmount(amountCents)}\` against your balance in this group.`,
-      { parse_mode: "Markdown", reply_markup: keyboard }
+      `<b>⚠️ RECORD PAYMENT?</b>\n\n` +
+      `You are about to record a payment of <code>$${formatAmount(amountCents)}</code> against your balance in this group.`,
+      { parse_mode: "HTML", reply_markup: keyboard }
     );
   });
 
@@ -85,34 +85,34 @@ export function registerPaymentHandler(bot: Bot<BotContext>): void {
       const unpaid = summary.total_invoiced - summary.total_paid;
 
       const lines = [
-        `✅ *Payment Recorded by Tom's Bill Bot 💰*`,
+        "✅ <b>Payment Recorded by Tom's Bill Bot 💰</b>",
         "",
         `• Payment ID: #${payment.id}`,
-        `• Amount: \`$${formatAmount(amountCents)}\``,
-        `• Status: \`${payment.status.toUpperCase()}\``,
+        `• Amount: <code>$${formatAmount(amountCents)}</code>`,
+        `• Status: <code>${payment.status.toUpperCase()}</code>`,
       ];
 
       if (invoice) {
-        lines.push(`• Linked to Invoice #${invoice.id} (${invoice.status.toUpperCase()})`);
+        lines.push(`• Linked to Invoice #${invoice.id} (<code>${invoice.status.toUpperCase()}</code>)`);
       }
 
       lines.push(
         "",
-        `*Updated Balance:*`,
-        `• Total Invoiced: \`$${formatAmount(summary.total_invoiced)}\``,
-        `• Total Paid: \`$${formatAmount(summary.total_paid)}\``,
-        `• Remaining: \`$${formatAmount(Math.max(0, unpaid))}\``
+        "<b>Updated Balance:</b>",
+        `• Total Invoiced: <code>$${formatAmount(summary.total_invoiced)}</code>`,
+        `• Total Paid: <code>$${formatAmount(summary.total_paid)}</code>`,
+        `• Remaining: <code>$${formatAmount(Math.max(0, unpaid))}</code>`
       );
 
       if (unpaid <= 0) {
         lines.push("", "All invoices are fully paid! Tom's Bill Bot is happy!");
       }
 
-      await ctx.editMessageText(lines.join("\n"), { parse_mode: "Markdown" });
+      await ctx.editMessageText(lines.join("\n"), { parse_mode: "HTML" });
       await ctx.answerCallbackQuery();
     } catch (err) {
       console.error("Payment failed:", err);
-      await ctx.editMessageText("❌ *Yikes!* Tom's Bill Bot encountered an error while recording payment.");
+      await ctx.editMessageText("❌ <b>Yikes!</b> Tom's Bill Bot encountered an error while recording payment.", { parse_mode: "HTML" });
       await ctx.answerCallbackQuery();
     }
   });
@@ -146,7 +146,7 @@ export function registerPaymentHandler(bot: Bot<BotContext>): void {
     const unpaid = summary.total_invoiced - summary.total_paid;
 
     if (unpaid <= 0) {
-      await ctx.reply("You have no outstanding balance to settle. All invoices are fully paid!", { parse_mode: "Markdown" });
+      await ctx.reply("You have no outstanding balance to settle. All invoices are fully paid!", { parse_mode: "HTML" });
       return;
     }
 
@@ -155,9 +155,9 @@ export function registerPaymentHandler(bot: Bot<BotContext>): void {
       .text("❌ Cancel", `cancel_settle:${userId}`);
 
     await ctx.reply(
-      `*⚠️ SETTLE ENTIRE BALANCE?*\n\n` +
-      `This will record a payment for your entire remaining balance of \`$${formatAmount(unpaid)}\`.`,
-      { parse_mode: "Markdown", reply_markup: keyboard }
+      "<b>⚠️ SETTLE ENTIRE BALANCE?</b>\n\n" +
+      `This will record a payment for your entire remaining balance of <code>$${formatAmount(unpaid)}</code>.`,
+      { parse_mode: "HTML", reply_markup: keyboard }
     );
   });
 
@@ -192,27 +192,27 @@ export function registerPaymentHandler(bot: Bot<BotContext>): void {
       const { payment, invoice } = await recordPayment(db, userId, chatId, unpaid);
 
       const lines = [
-        `✅ *Balance Settled! 💰*`,
+        "✅ <b>Balance Settled! 💰</b>",
         "",
         `• Payment ID: #${payment.id}`,
-        `• Amount: \`$${formatAmount(unpaid)}\``,
-        `• Status: \`${payment.status.toUpperCase()}\``,
+        `• Amount: <code>$${formatAmount(unpaid)}</code>`,
+        `• Status: <code>${payment.status.toUpperCase()}</code>`,
       ];
 
       if (invoice) {
-        lines.push(`• Linked to Invoice #${invoice.id} (${invoice.status.toUpperCase()})`);
+        lines.push(`• Linked to Invoice #${invoice.id} (<code>${invoice.status.toUpperCase()}</code>)`);
       }
 
       lines.push(
         "",
-        `All invoices are now fully paid! Tom's Bill Bot is happy!`
+        "All invoices are now fully paid! Tom's Bill Bot is happy!"
       );
 
-      await ctx.editMessageText(lines.join("\n"), { parse_mode: "Markdown" });
+      await ctx.editMessageText(lines.join("\n"), { parse_mode: "HTML" });
       await ctx.answerCallbackQuery();
     } catch (err) {
       console.error("Settle failed:", err);
-      await ctx.editMessageText("❌ *Yikes!* Tom's Bill Bot encountered an error while settling balance.");
+      await ctx.editMessageText("❌ <b>Yikes!</b> Tom's Bill Bot encountered an error while settling balance.", { parse_mode: "HTML" });
       await ctx.answerCallbackQuery();
     }
   });

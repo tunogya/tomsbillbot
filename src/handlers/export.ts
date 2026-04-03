@@ -9,7 +9,7 @@ export function registerExportHandler(bot: Bot<BotContext>): void {
     if (!userId) return;
 
     if (ctx.chat?.type !== "private") {
-      await ctx.reply("Psst! Tom's Bill Bot says you should run \`/export\` in our private DMs so I can safely send you the files.", { parse_mode: "Markdown" });
+      await ctx.reply("Psst! Tom's Bill Bot says you should run <code>/export</code> in our private DMs so I can safely send you the files.", { parse_mode: "HTML" });
       return;
     }
 

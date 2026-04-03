@@ -12,6 +12,7 @@
 import type { AppEnv } from "../env";
 import { nowTs, durationMinutes, formatDuration, formatAmount } from "../utils/time";
 import { sendTelegramMessage } from "../utils/bot";
+import { escapeHtml } from "../utils/telegram";
 
 const STALE_THRESHOLD = 12 * 60 * 60; // 12 hours in seconds
 const ABANDON_THRESHOLD = 24 * 60 * 60; // 24 hours in seconds
@@ -63,10 +64,10 @@ export async function handleScheduled(env: AppEnv): Promise<void> {
     await sendTelegramMessage(
       env.BOT_TOKEN,
       session.chat_id,
-      `⏰ *Auto-closed session* for user \`${session.customer_id}\`\n\n` +
+      `⏰ <b>Auto-closed session</b> for user <code>${escapeHtml(session.customer_id.toString())}</code>\n\n` +
       `Session #${session.id} was active for over 24 hours and has been automatically closed.\n` +
-      `Duration: \`${formatDuration(duration)} hours\`\n\n` +
-      `_If this was unintentional, please start a new session with /work._`
+      `Duration: <code>${escapeHtml(formatDuration(duration))} hours</code>\n\n` +
+      `<i>If this was unintentional, please start a new session with /work.</i>`
     );
 
     console.log(`[scheduled] Auto-closed session #${session.id} (${formatDuration(duration)} hrs)`);
@@ -94,9 +95,9 @@ export async function handleScheduled(env: AppEnv): Promise<void> {
     await sendTelegramMessage(
       env.BOT_TOKEN,
       session.chat_id,
-      `⚠️ *Reminder:* User \`${session.customer_id}\` has a work session running for \`${formatDuration(elapsed)} hours\`.\n\n` +
+      `⚠️ <b>Reminder:</b> User <code>${escapeHtml(session.customer_id.toString())}</code> has a work session running for <code>${escapeHtml(formatDuration(elapsed))} hours</code>.\n\n` +
       `Don't forget to use /done when finished!\n` +
-      `_Sessions are auto-closed after 24 hours._`
+      `<i>Sessions are auto-closed after 24 hours.</i>`
     );
 
     // Mark as reminded (TTL = 24h so it won't re-remind)
@@ -123,8 +124,8 @@ export async function handleScheduled(env: AppEnv): Promise<void> {
     await sendTelegramMessage(
       env.BOT_TOKEN,
       inv.chat_id,
-      `📬 *Invoice #${inv.id} Reminder*\n\n` +
-      `User \`${inv.customer_id}\` has an unpaid invoice of \`$${formatAmount(inv.amount_due)}\`.\n` +
+      `📬 <b>Invoice #${inv.id} Reminder</b>\n\n` +
+      `User <code>${escapeHtml(inv.customer_id.toString())}</code> has an unpaid invoice of <code>$${formatAmount(inv.amount_due)}</code>.\n` +
       `Use /paid to record a payment.`
     );
 

@@ -1,3 +1,4 @@
+import { escapeHtml } from "./telegram";
 import type { BotContext } from "../env";
 
 /**
@@ -6,8 +7,8 @@ import type { BotContext } from "../env";
  */
 export async function ensureGroupChat(ctx: BotContext, commandName: string): Promise<boolean> {
   if (ctx.chat?.type === "private") {
-    await ctx.reply(`Hey there! Tom's Bill Bot can only process \`/${commandName}\` commands in group chats.`, {
-      parse_mode: "Markdown",
+    await ctx.reply(`Hey there! Tom's Bill Bot can only process <code>/${escapeHtml(commandName)}</code> commands in group chats.`, {
+      parse_mode: "HTML",
     });
     return false;
   }
@@ -22,7 +23,7 @@ export async function sendTelegramMessage(
   botToken: string,
   chatId: number,
   text: string,
-  parseMode: "Markdown" | "HTML" = "Markdown"
+  parseMode: "Markdown" | "HTML" = "HTML"
 ): Promise<boolean> {
   const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
   try {

@@ -28,11 +28,11 @@ export function registerResetHandler(bot: Bot<BotContext>): void {
       .text("❌ Cancel", "cancel_reset");
 
     await ctx.reply(
-      "*⚠️ CRITICAL ACTION: RESET DATA*\n\n" +
+      "<b>⚠️ CRITICAL ACTION: RESET DATA</b>\n\n" +
       "This will permanently delete all work sessions, invoices, and payment history for this group. " +
-      "This action *CANNOT* be undone.\n\n" +
+      "This action <b>CANNOT</b> be undone.\n\n" +
       "Are you absolutely sure?",
-      { parse_mode: "Markdown", reply_markup: keyboard }
+      { parse_mode: "HTML", reply_markup: keyboard }
     );
   });
 
@@ -64,15 +64,15 @@ export function registerResetHandler(bot: Bot<BotContext>): void {
     try {
       await resetGroupData(db, chatId);
       await ctx.editMessageText(
-        "✅ *Poof!* Tom's Bill Bot has permanently reset all historical bills, work sessions, and payments for this group.",
-        { parse_mode: "Markdown" }
+        "✅ <b>Poof!</b> Tom's Bill Bot has permanently reset all historical bills, work sessions, and payments for this group.",
+        { parse_mode: "HTML" }
       );
       await ctx.answerCallbackQuery();
     } catch (err) {
       console.error("Failed to reset group data:", err);
       await ctx.editMessageText(
-        "❌ *Yikes!* Tom's Bill Bot encountered an error while resetting data.",
-        { parse_mode: "Markdown" }
+        "❌ <b>Yikes!</b> Tom's Bill Bot encountered an error while resetting data.",
+        { parse_mode: "HTML" }
       );
       await ctx.answerCallbackQuery();
     }

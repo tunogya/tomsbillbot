@@ -21,6 +21,7 @@ import {
 } from "../services/db";
 import { nowTs, durationMinutes, formatDuration, formatTimestamp, roundToGranularity } from "../utils/time";
 import { getCachedGranularity } from "../utils/cache";
+import { escapeHtml } from "../utils/telegram";
 import type { BotContext } from "../env";
 
 import { ensureGroupChat } from "../utils/bot";
@@ -44,8 +45,8 @@ export function registerWorkHandlers(bot: Bot<BotContext>): void {
       const amount = parseFloat(amountStr);
       if (isNaN(amount) || amount <= 0) {
         await ctx.reply(
-          "Tom's Bill Bot didn't catch that. Please use a positive number for the hours, like `/work 1.5`.",
-          { parse_mode: "Markdown" }
+          "Tom's Bill Bot didn't catch that. Please use a positive number for the hours, like <code>/work 1.5</code>.",
+          { parse_mode: "HTML" }
         );
         return;
       }
@@ -61,9 +62,9 @@ export function registerWorkHandlers(bot: Bot<BotContext>): void {
       try {
         await logManualWorkSession(db, userId, chatId, duration);
         await ctx.reply(
-          `*Manual work logged! Tom's Bill Bot is impressed!*\n\n` +
-          `Duration: \`${formatDuration(duration)} hours\``,
-          { parse_mode: "Markdown" }
+          "<b>Manual work logged! Tom's Bill Bot is impressed!</b>\n\n" +
+          `Duration: <code>${escapeHtml(formatDuration(duration))} hours</code>`,
+          { parse_mode: "HTML" }
         );
         return;
       } catch (err) {
@@ -77,8 +78,8 @@ export function registerWorkHandlers(bot: Bot<BotContext>): void {
     const existing = await getActiveSession(db, userId, chatId);
     if (existing) {
       await ctx.reply(
-        `Tom's Bill Bot sees you're already grinding! 💼\nYou have an active session from \`${formatTimestamp(existing.start_time)}\`.\nUse /done to clock out first.`,
-        { parse_mode: "Markdown" }
+        `Tom's Bill Bot sees you're already grinding! 💼\nYou have an active session from <code>${escapeHtml(formatTimestamp(existing.start_time))}</code>.\nUse /done to clock out first.`,
+        { parse_mode: "HTML" }
       );
       return;
     }
@@ -89,9 +90,9 @@ export function registerWorkHandlers(bot: Bot<BotContext>): void {
       const session = await startWorkSession(db, userId, chatId);
 
       await ctx.reply(
-        `*Work session started! Tom's Bill Bot is on the clock!*\n\n` +
-        `Don't forget to use /done when you're finished.`,
-        { parse_mode: "Markdown" }
+        "<b>Work session started! Tom's Bill Bot is on the clock!</b>\n\n" +
+        "Don't forget to use /done when you're finished.",
+        { parse_mode: "HTML" }
       );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -118,8 +119,8 @@ export function registerWorkHandlers(bot: Bot<BotContext>): void {
     const existing = await getActiveSession(db, userId, chatId);
     if (!existing) {
       await ctx.reply(
-        `Tom's Bill Bot couldn't find an active work session to cancel!\n(Manual work logs via \`/work <hours>\` cannot be cancelled this way.)`,
-        { parse_mode: "Markdown" }
+        "Tom's Bill Bot couldn't find an active work session to cancel!\n(Manual work logs via <code>/work &lt;hours&gt;</code> cannot be cancelled this way.)",
+        { parse_mode: "HTML" }
       );
       return;
     }
@@ -129,9 +130,9 @@ export function registerWorkHandlers(bot: Bot<BotContext>): void {
       .text("❌ Cancel", `cancel_discard:${userId}`);
 
     await ctx.reply(
-      `*⚠️ DISCARD ACTIVE TIMER?*\n\n` +
-      `This will permanently delete your currently active work session timer.`,
-      { parse_mode: "Markdown", reply_markup: keyboard }
+      "<b>⚠️ DISCARD ACTIVE TIMER?</b>\n\n" +
+      "This will permanently delete your currently active work session timer.",
+      { parse_mode: "HTML", reply_markup: keyboard }
     );
   });
 
@@ -153,13 +154,13 @@ export function registerWorkHandlers(bot: Bot<BotContext>): void {
     const deleted = await deleteActiveSession(db, userId, chatId);
     if (deleted) {
       await ctx.editMessageText(
-        `*Work session cancelled! Tom's Bill Bot has wiped the slate clean. 🧹*`,
-        { parse_mode: "Markdown" }
+        "<b>Work session cancelled! Tom's Bill Bot has wiped the slate clean. 🧹</b>",
+        { parse_mode: "HTML" }
       );
     } else {
       await ctx.editMessageText(
-        `Tom's Bill Bot couldn't find that active session anymore. It might have already been processed.`,
-        { parse_mode: "Markdown" }
+        "Tom's Bill Bot couldn't find that active session anymore. It might have already been processed.",
+        { parse_mode: "HTML" }
       );
     }
     await ctx.answerCallbackQuery();
@@ -203,9 +204,9 @@ export function registerWorkHandlers(bot: Bot<BotContext>): void {
     await completeWorkSession(db, session.id, endTime, duration);
 
     await ctx.reply(
-      `*Work session ended! Tom's Bill Bot says great job!*\n\n` +
-      `Duration: \`${formatDuration(duration)} hours\``,
-      { parse_mode: "Markdown" }
+      "<b>Work session ended! Tom's Bill Bot says great job!</b>\n\n" +
+      `Duration: <code>${escapeHtml(formatDuration(duration))} hours</code>`,
+      { parse_mode: "HTML" }
     );
   });
 
@@ -223,9 +224,9 @@ export function registerWorkHandlers(bot: Bot<BotContext>): void {
       .text("❌ Cancel", `cancel_undo:${userId}`);
 
     await ctx.reply(
-      `*⚠️ UNDO LAST SESSION?*\n\n` +
-      `This will delete your most recent work session or timer if it hasn't been invoiced yet.`,
-      { parse_mode: "Markdown", reply_markup: keyboard }
+      "<b>⚠️ UNDO LAST SESSION?</b>\n\n" +
+      "This will delete your most recent work session or timer if it hasn't been invoiced yet.",
+      { parse_mode: "HTML", reply_markup: keyboard }
     );
   });
 
@@ -248,15 +249,15 @@ export function registerWorkHandlers(bot: Bot<BotContext>): void {
     if (reverted) {
       let msg = "";
       if (reverted.duration_minutes !== null) {
-        msg = `*Undo successful! ⏪*\n\nTom's Bill Bot has deleted your last completed work session (\`${formatDuration(reverted.duration_minutes)} hours\`).`;
+        msg = `<b>Undo successful! ⏪</b>\n\nTom's Bill Bot has deleted your last completed work session (<code>${escapeHtml(formatDuration(reverted.duration_minutes))} hours</code>).`;
       } else {
-        msg = `*Undo successful! ⏪*\n\nTom's Bill Bot has deleted your currently active timer.`;
+        msg = "<b>Undo successful! ⏪</b>\n\nTom's Bill Bot has deleted your currently active timer.";
       }
-      await ctx.editMessageText(msg, { parse_mode: "Markdown" });
+      await ctx.editMessageText(msg, { parse_mode: "HTML" });
     } else {
       await ctx.editMessageText(
         "Tom's Bill Bot couldn't find any recent uninvoiced work sessions to undo.",
-        { parse_mode: "Markdown" }
+        { parse_mode: "HTML" }
       );
     }
     await ctx.answerCallbackQuery();

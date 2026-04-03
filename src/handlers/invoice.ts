@@ -49,8 +49,8 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
 
     if (unitAmount <= 0) {
       await ctx.reply(
-        "Tom's Bill Bot noticed your hourly rate for this chat is missing! Use `/setrate <amount>` first.",
-        { parse_mode: "Markdown" }
+        "Tom's Bill Bot noticed your hourly rate for this chat is missing! Use <code>/setrate &lt;amount&gt;</code> first.",
+        { parse_mode: "HTML" }
       );
       return;
     }
@@ -115,21 +115,21 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
     }
 
     const lines = [
-      "*Your Recent Invoices*",
+      "<b>Your Recent Invoices</b>",
       "",
       ...invoices.map((inv) => {
         const date = formatTimestamp(inv.created).split(" ")[0]; // Just the YYYY-MM-DD
         const status = inv.status.toUpperCase();
         const statusEmoji = status === "PAID" ? "✅" : "⏳";
-        return `• #${inv.id} (${date}) - \`${formatAmount(inv.total)}\` ${statusEmoji} \`${status}\``;
+        return `• #${inv.id} (${date}) - <code>${formatAmount(inv.total)}</code> ${statusEmoji} <code>${escapeHtml(status)}</code>`;
       }),
       "",
-      "_Showing up to 5 most recent records._",
+      "<i>Showing up to 5 most recent records.</i>",
     ];
 
     // Find first unpaid invoice to show buttons for
     const unpaidInvoice = invoices.find(inv => inv.status === INVOICE_STATUS.OPEN || inv.status === INVOICE_STATUS.DRAFT);
-    const options: any = { parse_mode: "Markdown" };
+    const options: any = { parse_mode: "HTML" };
     
     if (unpaidInvoice) {
       options.reply_markup = new InlineKeyboard()
@@ -150,7 +150,7 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
     const commandText = ctx.message?.text || "";
     const args = commandText.split(/\s+/);
     if (args.length < 2) {
-      await ctx.reply("Usage: `/void <id>`", { parse_mode: "Markdown" });
+      await ctx.reply("Usage: <code>/void &lt;id&gt;</code>", { parse_mode: "HTML" });
       return;
     }
 
@@ -165,9 +165,9 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
       .text("✅ Keep Invoice", `cancel_void:${userId}`);
 
     await ctx.reply(
-      `*⚠️ VOID INVOICE #${invoiceId}?*\n\n` +
+      `<b>⚠️ VOID INVOICE #${invoiceId}?</b>\n\n` +
       `This will cancel the invoice and it will no longer count towards your balance.`,
-      { parse_mode: "Markdown", reply_markup: keyboard }
+      { parse_mode: "HTML", reply_markup: keyboard }
     );
   });
 
@@ -242,19 +242,19 @@ export function registerInvoiceHandler(bot: Bot<BotContext>): void {
     const totalMinutes = sumDurations(sessions);
 
     const lines = [
-      `*Uninvoiced Work Sessions*`,
+      "<b>Uninvoiced Work Sessions</b>",
       "",
       ...sessions.map((s, i) => {
         const date = formatTimestamp(s.start_time).split(" ")[0]; // Just the YYYY-MM-DD
-        return `${i + 1}. ${date} - \`${formatDuration(s.duration_minutes ?? 0)} hours\``;
+        return `${i + 1}. ${date} - <code>${formatDuration(s.duration_minutes ?? 0)} hours</code>`;
       }),
       "",
-      `*Total Unbilled:* \`${formatDuration(totalMinutes)} hours\``,
+      `<b>Total Unbilled:</b> <code>${formatDuration(totalMinutes)} hours</code>`,
       "",
-      "_Ready to bill? Use /invoice_"
+      "<i>Ready to bill? Use /invoice</i>"
     ];
 
-    await ctx.reply(lines.join("\n"), { parse_mode: "Markdown" });
+    await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
   });
 
   bot.callbackQuery(/^void_(\d+)$/, async (ctx) => {
