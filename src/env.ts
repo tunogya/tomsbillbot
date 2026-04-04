@@ -4,7 +4,7 @@
 export interface AppEnv {
   DB: D1Database;
   KV: KVNamespace;
-  MY_QUEUE: Queue;
+  QUEUE: Queue;
   BOT_TOKEN: string;
   BOT_SECRET: string;
 }

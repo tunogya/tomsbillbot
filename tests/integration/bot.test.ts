@@ -156,7 +156,7 @@ function makeEnv(): TestEnv {
     BOT_TOKEN,
     DB: new TestD1Database(sqlite) as unknown as D1Database,
     KV: new TestKVNamespace() as unknown as KVNamespace,
-    MY_QUEUE: queue as unknown as Queue,
+    QUEUE: queue as unknown as Queue,
     __queue: queue,
   };
 }

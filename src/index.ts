@@ -61,7 +61,7 @@ app.post("/webhook", async (c) => {
     }
 
     // Push to queue for async processing
-    await c.env.MY_QUEUE.send(update);
+    await c.env.QUEUE.send(update);
 
     return c.json({ ok: true });
   } catch (err) {

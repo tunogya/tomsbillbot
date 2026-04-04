@@ -23,7 +23,7 @@ The webhook endpoint is stateless: it validates the secret header, pushes the ra
 **Cloudflare bindings:**
 - `DB` - D1 database (SQLite). All amounts in cents, all timestamps in Unix seconds.
 - `KV` - idempotency cache (dedup `update_id`), rate limiting, and scheduled-task reminder dedup.
-- `MY_QUEUE` - Queue for async update processing. Dead-letter queue: `billbot-dlq`.
+- `QUEUE` - Queue for async update processing. Dead-letter queue: `billbot-dlq`.
 
 **Cron trigger** (`0 */6 * * *`): auto-closes sessions >24h, reminds about stale sessions >12h, reminds about unpaid invoices >7 days. Implemented in `src/services/scheduled.ts`.
 

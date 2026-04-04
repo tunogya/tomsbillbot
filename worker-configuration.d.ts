@@ -10,7 +10,7 @@ declare namespace Cloudflare {
 		BOT_TOKEN: string;
 		BOT_SECRET: string;
 		DB: D1Database;
-		MY_QUEUE: Queue;
+		QUEUE: Queue;
 	}
 }
 interface Env extends Cloudflare.Env {}
