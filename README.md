@@ -75,7 +75,7 @@ You will need to create a D1 database, a KV namespace, and a Queue in your Cloud
 npx wrangler d1 create billbot-db
 
 # Create KV Namespace
-npx wrangler kv:namespace create KV
+npx wrangler kv namespace create KV
 
 # Create Queue
 npx wrangler queues create billbot
