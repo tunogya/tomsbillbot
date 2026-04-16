@@ -4,7 +4,7 @@
 	"private": true,
 	"dependencies": {
 		"grammy": "^1.35.0",
-		"hono": "4.12.10"
+		"hono": "4.12.14"
 	},
 	"devDependencies": {
 		"@types/node": "24.10.1",
